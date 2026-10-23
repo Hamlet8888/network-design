@@ -34,7 +34,7 @@ No OSPF anywhere. All infrastructure addressing sits inside each site's own /16 
 |---|---|
 | `fabric_design/build.py` | The generator: design rules, address plan, NX-OS and PAN-OS templates, workbook |
 | `examples/demo-fabric.json` | Fictional two-site input (DC1/DC2) |
-| `examples/demo/` | Workbook, configs, day-2 checks and DCI option diagrams generated from the demo input |
+| `examples/demo/` | Workbook, configs, day-2 checks, expected state and DCI option diagrams generated from the demo input |
 | `tests/` | Input validation and cross-device consistency checks on generated output |
 | `private/` | **Git-ignored.** Real site data and everything generated from it |
 
@@ -73,6 +73,16 @@ show commands to run and what they should return: BGP sessions by neighbor and A
 Multi-Site fabric/DCI links, the default route before and after the firewall move, remote-site and cloud
 routes. `checks/checks.json` carries the same list for automation, and section 13 of the workbook shows it.
 The expectations come from the same model as the configs, and the tests check that they agree.
+
+### Expected state
+
+`expected-state.json` is the design as data, for
+[network-automation-tools](https://github.com/Hamlet8888/network-automation-tools) to audit live switches
+against. For every switch it lists the role, ASN and router-ID, the routed fabric links with MTU and
+address, every BGP session (VRF, address family, neighbor, remote AS, BFD, and the migration step that
+brings it up or, for the legacy core, removes it), the VNIs with their VLAN or VRF and route target, the
+NVE source addresses, the vPC domain and keepalive, and the Multi-Site site ID, VIP, fabric and DCI links.
+`schema_version` changes whenever the format does. A test checks it against the generated configs.
 
 ### Management baseline
 
@@ -141,6 +151,7 @@ The tests parse the generated NX-OS configs (`tests/nxos.py`) and check them acr
 - **Policy:** every route-map, prefix-list and as-path list is defined where used, and a prefix-list name
   means the same thing on every switch of a site.
 - **Firewall:** the PAN-OS peers, ASNs, transit subnets and ports match the border leafs.
+- **Expected state:** `expected-state.json` matches the configs: sessions, BFD, MTU, VNIs, RTs, vPC, Multi-Site.
 - **Demo output:** `examples/demo/` matches what the generator produces now.
 
 GitHub Actions runs the suite on Python 3.9 and 3.13 for every push and pull request.
