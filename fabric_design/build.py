@@ -125,6 +125,31 @@ def validate(data):
             elif int(core_ip.split(".")[3]) in (11, 12):
                 errors.append(f"{site}: legacy_core_ip {core_ip} collides with a border-leaf SVI (.11/.12)")
 
+    bl = data.get("baseline")
+    if bl:
+        for key in ("dns", "ntp", "syslog", "tacacs"):
+            if not bl.get(key):
+                errors.append(f"baseline {key}: needs at least one server")
+            for ip in bl.get(key, []):
+                try:
+                    ipaddress.ip_address(ip)
+                except ValueError:
+                    errors.append(f"baseline {key}: {ip!r} is not an IP address")
+        for ip in bl.get("snmp", {}).get("hosts", []):
+            try:
+                ipaddress.ip_address(ip)
+            except ValueError:
+                errors.append(f"baseline snmp hosts: {ip!r} is not an IP address")
+        for net in bl.get("mgmt_acl", []):
+            try:
+                ipaddress.ip_network(net)
+            except ValueError:
+                errors.append(f"baseline mgmt_acl: {net!r} is not a network")
+        if not 0 <= bl.get("syslog_level", 5) <= 7:
+            errors.append("baseline syslog_level must be 0-7")
+        if any("^" in line for line in bl.get("banner", [])):
+            errors.append("baseline banner may not contain '^' (the banner delimiter)")
+
     site_nets = {x["code"]: ipaddress.ip_network(f"10.{x['octet']}.0.0/16") for x in sites if 0 <= x["octet"] <= 255}
     for kind in ("aws_prefixes", "azure_prefixes"):
         for p in data["cloud"][kind]:
@@ -1073,7 +1098,7 @@ router bgp {asn}
     neighbor {aws_peer}
       remote-as {AWS_ASN}
       description AWS Direct Connect private VIF ({dx_conn})
-      password <BGP MD5 key from Secret Server>
+      password <AWS-BGP-MD5-KEY>          ! from the vault, same key as on the VIF
       bfd
       address-family ipv4 unicast
         route-map RM-AWS-IN in
@@ -1092,19 +1117,74 @@ router bgp {asn}
 
 def mgmt_cfg(site, idx):
     o = SITES[site]["o"]
+    bl = DATA.get("baseline")
+    dns = ""
+    if bl:
+        dns = "".join(f"\n  ip name-server {ip}" for ip in bl["dns"]) + f"\n  ip domain-name {bl['domain']}"
     return f"""
 ! ---- out-of-band management (10.{o}.245.0/24, gateway on the firewall) ---
 vrf context management
-  ip route 0.0.0.0/0 10.{o}.245.1
+  ip route 0.0.0.0/0 10.{o}.245.1{dns}
 interface mgmt0
   vrf member management
   ip address 10.{o}.245.{DEVICES[idx][5]}/24
 """.strip("\n")
 
 
+def baseline_cfg(site, idx):
+    """Management-plane baseline from the data file's "baseline" block. Every service runs in VRF
+    management from mgmt0; secrets stay <placeholders> and are filled in from the vault at deployment."""
+    bl = DATA.get("baseline")
+    if not bl:
+        return ""
+    S = SITES[site]
+    tacacs = bl["tacacs"]
+    lines = ["! ---- baseline: hardening -------------------------------------------",
+             "no feature telnet", "feature ssh", "password strength-check",
+             "copp profile strict", "",
+             "ip access-list ACL-VTY"]
+    for i, net in enumerate(bl["mgmt_acl"]):
+        lines.append(f"  {10 * (i + 1)} permit tcp {net} any eq 22")
+    lines += ["  1000 deny ip any any log",
+              "line console", f"  exec-timeout {bl['exec_timeout']}",
+              "line vty", f"  exec-timeout {bl['exec_timeout']}", "  access-class ACL-VTY in", "",
+              "! ---- baseline: AAA (TACACS+, local fallback when no server answers) -----",
+              "feature tacacs+"]
+    lines += [f"tacacs-server host {ip} key 7 <TACACS-KEY-TYPE7>" for ip in tacacs]
+    lines += ["aaa group server tacacs+ TACACS"] + [f"  server {ip}" for ip in tacacs]
+    lines += ["  use-vrf management", "  source-interface mgmt0",
+              "aaa authentication login default group TACACS",
+              "aaa authentication login console local",
+              "aaa authorization commands default group TACACS local",
+              "aaa accounting default group TACACS",
+              "aaa authentication login error-enable",
+              "username admin password 5 <LOCAL-ADMIN-HASH> role network-admin", "",
+              "! ---- baseline: time, logging, SNMPv3 ----------------------------------",
+              f"clock timezone {bl['timezone']} 0 0"]
+    for i, ip in enumerate(bl["ntp"]):
+        lines.append(f"ntp server {ip} use-vrf management" + (" prefer" if i == 0 else ""))
+    lines += ["ntp source-interface mgmt0", ""]
+    lines += [f"logging server {ip} {bl['syslog_level']} use-vrf management" for ip in bl["syslog"]]
+    lines += ["logging source-interface mgmt0", "logging timestamp milliseconds", ""]
+    snmp = bl["snmp"]
+    lines += [f"snmp-server contact {snmp['contact']}",
+              f"snmp-server location {S['code']} {S['facility']}, {S['city']}",
+              f"snmp-server user {snmp['user']} network-operator auth sha <SNMP-AUTH-KEY> priv aes-128 <SNMP-PRIV-KEY>"]
+    for ip in snmp["hosts"]:
+        lines += [f"snmp-server host {ip} traps version 3 priv {snmp['user']}",
+                  f"snmp-server host {ip} use-vrf management"]
+    lines += ["snmp-server source-interface traps mgmt0", "snmp-server enable traps bgp", "",
+              "banner motd ^", *bl["banner"], "^"]
+    return "\n".join(lines)
+
+
 def header(site, idx):
     role, suf = DEVICES[idx][0], DEVICES[idx][1]
     platform = f" · {bgw_platform()}" if suf.startswith("NXBGW") else ""
+    if DATA.get("baseline"):
+        baseline_line = "Baseline included: AAA/TACACS+, NTP, syslog, SNMPv3, CoPP, SSH-only vty, banner."
+    else:
+        baseline_line = f"Not included: AAA/TACACS, NTP, SNMP, syslog, banners, users. {DATA['doc']['baseline_note']}"
     return f"""
 !==============================================================================
 ! {host(site, suf)} · {role} · BGP AS {dev_asn(site, suf)}{platform}
@@ -1112,7 +1192,7 @@ def header(site, idx):
 ! {DATA['doc']['classification']}
 ! Template: validate against the exact Nexus model and NX-OS release before use.
 ! Fill in every <placeholder>. Host-gateway SVIs ship shut (migration step M4).
-! Not included: AAA/TACACS, NTP, SNMP, syslog, banners, users. {DATA['doc']['baseline_note']}
+! {baseline_line}
 !==============================================================================
 """.strip("\n")
 
@@ -1128,7 +1208,9 @@ def full_config(site, idx):
         if suf in ("NXLF-03", "NXLF-04"):
             body += "\n\n" + cfg_border_extra(site, idx)
     lines = body.split("\n")
-    return "\n".join([header(site, idx), "", lines[0], "", mgmt_cfg(site, idx)] + lines[1:]) + "\n"
+    base = baseline_cfg(site, idx)
+    extra = ["", base] if base else []
+    return "\n".join([header(site, idx), "", lines[0], "", mgmt_cfg(site, idx)] + extra + lines[1:]) + "\n"
 
 
 def write_configs(outdir):

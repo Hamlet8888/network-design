@@ -235,7 +235,7 @@ set network virtual-router default protocol bgp policy import rules DENY-REST en
 ! FICTIONAL DEMO DATA: not for any real network.
 ! Template: validate against the exact Nexus model and NX-OS release before use.
 ! Fill in every &lt;placeholder&gt;. Host-gateway SVIs ship shut (migration step M4).
-! Not included: AAA/TACACS, NTP, SNMP, syslog, banners, users. Apply your own baseline.
+! Baseline included: AAA/TACACS+, NTP, syslog, SNMPv3, CoPP, SSH-only vty, banner.
 !==============================================================================
 
 hostname DC1-NXSP-01
@@ -243,9 +243,68 @@ hostname DC1-NXSP-01
 ! ---- out-of-band management (10.110.245.0/24, gateway on the firewall) ---
 vrf context management
   ip route 0.0.0.0/0 10.110.245.1
+  ip name-server 10.250.0.53
+  ip name-server 10.250.1.53
+  ip domain-name dc.example.net
 interface mgmt0
   vrf member management
   ip address 10.110.245.11/24
+
+! ---- baseline: hardening -------------------------------------------
+no feature telnet
+feature ssh
+password strength-check
+copp profile strict
+
+ip access-list ACL-VTY
+  10 permit tcp 10.110.245.0/24 any eq 22
+  20 permit tcp 10.120.245.0/24 any eq 22
+  30 permit tcp 10.250.0.0/23 any eq 22
+  1000 deny ip any any log
+line console
+  exec-timeout 10
+line vty
+  exec-timeout 10
+  access-class ACL-VTY in
+
+! ---- baseline: AAA (TACACS+, local fallback when no server answers) -----
+feature tacacs+
+tacacs-server host 10.250.0.49 key 7 &lt;TACACS-KEY-TYPE7&gt;
+tacacs-server host 10.250.1.49 key 7 &lt;TACACS-KEY-TYPE7&gt;
+aaa group server tacacs+ TACACS
+  server 10.250.0.49
+  server 10.250.1.49
+  use-vrf management
+  source-interface mgmt0
+aaa authentication login default group TACACS
+aaa authentication login console local
+aaa authorization commands default group TACACS local
+aaa accounting default group TACACS
+aaa authentication login error-enable
+username admin password 5 &lt;LOCAL-ADMIN-HASH&gt; role network-admin
+
+! ---- baseline: time, logging, SNMPv3 ----------------------------------
+clock timezone UTC 0 0
+ntp server 10.250.0.123 use-vrf management prefer
+ntp server 10.250.1.123 use-vrf management
+ntp source-interface mgmt0
+
+logging server 10.250.0.40 5 use-vrf management
+logging source-interface mgmt0
+logging timestamp milliseconds
+
+snmp-server contact noc@example.net
+snmp-server location DC1 Example colo, Example City A
+snmp-server user nms-ro network-operator auth sha &lt;SNMP-AUTH-KEY&gt; priv aes-128 &lt;SNMP-PRIV-KEY&gt;
+snmp-server host 10.250.0.162 traps version 3 priv nms-ro
+snmp-server host 10.250.0.162 use-vrf management
+snmp-server source-interface traps mgmt0
+snmp-server enable traps bgp
+
+banner motd ^
+Authorized access only. Activity is logged and monitored.
+Disconnect now if you are not an authorized user.
+^
 
 nv overlay evpn
 feature bgp
@@ -403,7 +462,7 @@ router bgp 65210
 ! FICTIONAL DEMO DATA: not for any real network.
 ! Template: validate against the exact Nexus model and NX-OS release before use.
 ! Fill in every &lt;placeholder&gt;. Host-gateway SVIs ship shut (migration step M4).
-! Not included: AAA/TACACS, NTP, SNMP, syslog, banners, users. Apply your own baseline.
+! Baseline included: AAA/TACACS+, NTP, syslog, SNMPv3, CoPP, SSH-only vty, banner.
 !==============================================================================
 
 hostname DC1-NXSP-02
@@ -411,9 +470,68 @@ hostname DC1-NXSP-02
 ! ---- out-of-band management (10.110.245.0/24, gateway on the firewall) ---
 vrf context management
   ip route 0.0.0.0/0 10.110.245.1
+  ip name-server 10.250.0.53
+  ip name-server 10.250.1.53
+  ip domain-name dc.example.net
 interface mgmt0
   vrf member management
   ip address 10.110.245.12/24
+
+! ---- baseline: hardening -------------------------------------------
+no feature telnet
+feature ssh
+password strength-check
+copp profile strict
+
+ip access-list ACL-VTY
+  10 permit tcp 10.110.245.0/24 any eq 22
+  20 permit tcp 10.120.245.0/24 any eq 22
+  30 permit tcp 10.250.0.0/23 any eq 22
+  1000 deny ip any any log
+line console
+  exec-timeout 10
+line vty
+  exec-timeout 10
+  access-class ACL-VTY in
+
+! ---- baseline: AAA (TACACS+, local fallback when no server answers) -----
+feature tacacs+
+tacacs-server host 10.250.0.49 key 7 &lt;TACACS-KEY-TYPE7&gt;
+tacacs-server host 10.250.1.49 key 7 &lt;TACACS-KEY-TYPE7&gt;
+aaa group server tacacs+ TACACS
+  server 10.250.0.49
+  server 10.250.1.49
+  use-vrf management
+  source-interface mgmt0
+aaa authentication login default group TACACS
+aaa authentication login console local
+aaa authorization commands default group TACACS local
+aaa accounting default group TACACS
+aaa authentication login error-enable
+username admin password 5 &lt;LOCAL-ADMIN-HASH&gt; role network-admin
+
+! ---- baseline: time, logging, SNMPv3 ----------------------------------
+clock timezone UTC 0 0
+ntp server 10.250.0.123 use-vrf management prefer
+ntp server 10.250.1.123 use-vrf management
+ntp source-interface mgmt0
+
+logging server 10.250.0.40 5 use-vrf management
+logging source-interface mgmt0
+logging timestamp milliseconds
+
+snmp-server contact noc@example.net
+snmp-server location DC1 Example colo, Example City A
+snmp-server user nms-ro network-operator auth sha &lt;SNMP-AUTH-KEY&gt; priv aes-128 &lt;SNMP-PRIV-KEY&gt;
+snmp-server host 10.250.0.162 traps version 3 priv nms-ro
+snmp-server host 10.250.0.162 use-vrf management
+snmp-server source-interface traps mgmt0
+snmp-server enable traps bgp
+
+banner motd ^
+Authorized access only. Activity is logged and monitored.
+Disconnect now if you are not an authorized user.
+^
 
 nv overlay evpn
 feature bgp
@@ -571,7 +689,7 @@ router bgp 65210
 ! FICTIONAL DEMO DATA: not for any real network.
 ! Template: validate against the exact Nexus model and NX-OS release before use.
 ! Fill in every &lt;placeholder&gt;. Host-gateway SVIs ship shut (migration step M4).
-! Not included: AAA/TACACS, NTP, SNMP, syslog, banners, users. Apply your own baseline.
+! Baseline included: AAA/TACACS+, NTP, syslog, SNMPv3, CoPP, SSH-only vty, banner.
 !==============================================================================
 
 hostname DC1-NXLF-01
@@ -579,9 +697,68 @@ hostname DC1-NXLF-01
 ! ---- out-of-band management (10.110.245.0/24, gateway on the firewall) ---
 vrf context management
   ip route 0.0.0.0/0 10.110.245.1
+  ip name-server 10.250.0.53
+  ip name-server 10.250.1.53
+  ip domain-name dc.example.net
 interface mgmt0
   vrf member management
   ip address 10.110.245.21/24
+
+! ---- baseline: hardening -------------------------------------------
+no feature telnet
+feature ssh
+password strength-check
+copp profile strict
+
+ip access-list ACL-VTY
+  10 permit tcp 10.110.245.0/24 any eq 22
+  20 permit tcp 10.120.245.0/24 any eq 22
+  30 permit tcp 10.250.0.0/23 any eq 22
+  1000 deny ip any any log
+line console
+  exec-timeout 10
+line vty
+  exec-timeout 10
+  access-class ACL-VTY in
+
+! ---- baseline: AAA (TACACS+, local fallback when no server answers) -----
+feature tacacs+
+tacacs-server host 10.250.0.49 key 7 &lt;TACACS-KEY-TYPE7&gt;
+tacacs-server host 10.250.1.49 key 7 &lt;TACACS-KEY-TYPE7&gt;
+aaa group server tacacs+ TACACS
+  server 10.250.0.49
+  server 10.250.1.49
+  use-vrf management
+  source-interface mgmt0
+aaa authentication login default group TACACS
+aaa authentication login console local
+aaa authorization commands default group TACACS local
+aaa accounting default group TACACS
+aaa authentication login error-enable
+username admin password 5 &lt;LOCAL-ADMIN-HASH&gt; role network-admin
+
+! ---- baseline: time, logging, SNMPv3 ----------------------------------
+clock timezone UTC 0 0
+ntp server 10.250.0.123 use-vrf management prefer
+ntp server 10.250.1.123 use-vrf management
+ntp source-interface mgmt0
+
+logging server 10.250.0.40 5 use-vrf management
+logging source-interface mgmt0
+logging timestamp milliseconds
+
+snmp-server contact noc@example.net
+snmp-server location DC1 Example colo, Example City A
+snmp-server user nms-ro network-operator auth sha &lt;SNMP-AUTH-KEY&gt; priv aes-128 &lt;SNMP-PRIV-KEY&gt;
+snmp-server host 10.250.0.162 traps version 3 priv nms-ro
+snmp-server host 10.250.0.162 use-vrf management
+snmp-server source-interface traps mgmt0
+snmp-server enable traps bgp
+
+banner motd ^
+Authorized access only. Activity is logged and monitored.
+Disconnect now if you are not an authorized user.
+^
 
 nv overlay evpn
 feature bgp
@@ -839,7 +1016,7 @@ router bgp 65211
 ! FICTIONAL DEMO DATA: not for any real network.
 ! Template: validate against the exact Nexus model and NX-OS release before use.
 ! Fill in every &lt;placeholder&gt;. Host-gateway SVIs ship shut (migration step M4).
-! Not included: AAA/TACACS, NTP, SNMP, syslog, banners, users. Apply your own baseline.
+! Baseline included: AAA/TACACS+, NTP, syslog, SNMPv3, CoPP, SSH-only vty, banner.
 !==============================================================================
 
 hostname DC1-NXLF-02
@@ -847,9 +1024,68 @@ hostname DC1-NXLF-02
 ! ---- out-of-band management (10.110.245.0/24, gateway on the firewall) ---
 vrf context management
   ip route 0.0.0.0/0 10.110.245.1
+  ip name-server 10.250.0.53
+  ip name-server 10.250.1.53
+  ip domain-name dc.example.net
 interface mgmt0
   vrf member management
   ip address 10.110.245.22/24
+
+! ---- baseline: hardening -------------------------------------------
+no feature telnet
+feature ssh
+password strength-check
+copp profile strict
+
+ip access-list ACL-VTY
+  10 permit tcp 10.110.245.0/24 any eq 22
+  20 permit tcp 10.120.245.0/24 any eq 22
+  30 permit tcp 10.250.0.0/23 any eq 22
+  1000 deny ip any any log
+line console
+  exec-timeout 10
+line vty
+  exec-timeout 10
+  access-class ACL-VTY in
+
+! ---- baseline: AAA (TACACS+, local fallback when no server answers) -----
+feature tacacs+
+tacacs-server host 10.250.0.49 key 7 &lt;TACACS-KEY-TYPE7&gt;
+tacacs-server host 10.250.1.49 key 7 &lt;TACACS-KEY-TYPE7&gt;
+aaa group server tacacs+ TACACS
+  server 10.250.0.49
+  server 10.250.1.49
+  use-vrf management
+  source-interface mgmt0
+aaa authentication login default group TACACS
+aaa authentication login console local
+aaa authorization commands default group TACACS local
+aaa accounting default group TACACS
+aaa authentication login error-enable
+username admin password 5 &lt;LOCAL-ADMIN-HASH&gt; role network-admin
+
+! ---- baseline: time, logging, SNMPv3 ----------------------------------
+clock timezone UTC 0 0
+ntp server 10.250.0.123 use-vrf management prefer
+ntp server 10.250.1.123 use-vrf management
+ntp source-interface mgmt0
+
+logging server 10.250.0.40 5 use-vrf management
+logging source-interface mgmt0
+logging timestamp milliseconds
+
+snmp-server contact noc@example.net
+snmp-server location DC1 Example colo, Example City A
+snmp-server user nms-ro network-operator auth sha &lt;SNMP-AUTH-KEY&gt; priv aes-128 &lt;SNMP-PRIV-KEY&gt;
+snmp-server host 10.250.0.162 traps version 3 priv nms-ro
+snmp-server host 10.250.0.162 use-vrf management
+snmp-server source-interface traps mgmt0
+snmp-server enable traps bgp
+
+banner motd ^
+Authorized access only. Activity is logged and monitored.
+Disconnect now if you are not an authorized user.
+^
 
 nv overlay evpn
 feature bgp
@@ -1107,7 +1343,7 @@ router bgp 65212
 ! FICTIONAL DEMO DATA: not for any real network.
 ! Template: validate against the exact Nexus model and NX-OS release before use.
 ! Fill in every &lt;placeholder&gt;. Host-gateway SVIs ship shut (migration step M4).
-! Not included: AAA/TACACS, NTP, SNMP, syslog, banners, users. Apply your own baseline.
+! Baseline included: AAA/TACACS+, NTP, syslog, SNMPv3, CoPP, SSH-only vty, banner.
 !==============================================================================
 
 hostname DC1-NXLF-03
@@ -1115,9 +1351,68 @@ hostname DC1-NXLF-03
 ! ---- out-of-band management (10.110.245.0/24, gateway on the firewall) ---
 vrf context management
   ip route 0.0.0.0/0 10.110.245.1
+  ip name-server 10.250.0.53
+  ip name-server 10.250.1.53
+  ip domain-name dc.example.net
 interface mgmt0
   vrf member management
   ip address 10.110.245.23/24
+
+! ---- baseline: hardening -------------------------------------------
+no feature telnet
+feature ssh
+password strength-check
+copp profile strict
+
+ip access-list ACL-VTY
+  10 permit tcp 10.110.245.0/24 any eq 22
+  20 permit tcp 10.120.245.0/24 any eq 22
+  30 permit tcp 10.250.0.0/23 any eq 22
+  1000 deny ip any any log
+line console
+  exec-timeout 10
+line vty
+  exec-timeout 10
+  access-class ACL-VTY in
+
+! ---- baseline: AAA (TACACS+, local fallback when no server answers) -----
+feature tacacs+
+tacacs-server host 10.250.0.49 key 7 &lt;TACACS-KEY-TYPE7&gt;
+tacacs-server host 10.250.1.49 key 7 &lt;TACACS-KEY-TYPE7&gt;
+aaa group server tacacs+ TACACS
+  server 10.250.0.49
+  server 10.250.1.49
+  use-vrf management
+  source-interface mgmt0
+aaa authentication login default group TACACS
+aaa authentication login console local
+aaa authorization commands default group TACACS local
+aaa accounting default group TACACS
+aaa authentication login error-enable
+username admin password 5 &lt;LOCAL-ADMIN-HASH&gt; role network-admin
+
+! ---- baseline: time, logging, SNMPv3 ----------------------------------
+clock timezone UTC 0 0
+ntp server 10.250.0.123 use-vrf management prefer
+ntp server 10.250.1.123 use-vrf management
+ntp source-interface mgmt0
+
+logging server 10.250.0.40 5 use-vrf management
+logging source-interface mgmt0
+logging timestamp milliseconds
+
+snmp-server contact noc@example.net
+snmp-server location DC1 Example colo, Example City A
+snmp-server user nms-ro network-operator auth sha &lt;SNMP-AUTH-KEY&gt; priv aes-128 &lt;SNMP-PRIV-KEY&gt;
+snmp-server host 10.250.0.162 traps version 3 priv nms-ro
+snmp-server host 10.250.0.162 use-vrf management
+snmp-server source-interface traps mgmt0
+snmp-server enable traps bgp
+
+banner motd ^
+Authorized access only. Activity is logged and monitored.
+Disconnect now if you are not an authorized user.
+^
 
 nv overlay evpn
 feature bgp
@@ -1474,7 +1769,7 @@ router bgp 65213
 ! FICTIONAL DEMO DATA: not for any real network.
 ! Template: validate against the exact Nexus model and NX-OS release before use.
 ! Fill in every &lt;placeholder&gt;. Host-gateway SVIs ship shut (migration step M4).
-! Not included: AAA/TACACS, NTP, SNMP, syslog, banners, users. Apply your own baseline.
+! Baseline included: AAA/TACACS+, NTP, syslog, SNMPv3, CoPP, SSH-only vty, banner.
 !==============================================================================
 
 hostname DC1-NXLF-04
@@ -1482,9 +1777,68 @@ hostname DC1-NXLF-04
 ! ---- out-of-band management (10.110.245.0/24, gateway on the firewall) ---
 vrf context management
   ip route 0.0.0.0/0 10.110.245.1
+  ip name-server 10.250.0.53
+  ip name-server 10.250.1.53
+  ip domain-name dc.example.net
 interface mgmt0
   vrf member management
   ip address 10.110.245.24/24
+
+! ---- baseline: hardening -------------------------------------------
+no feature telnet
+feature ssh
+password strength-check
+copp profile strict
+
+ip access-list ACL-VTY
+  10 permit tcp 10.110.245.0/24 any eq 22
+  20 permit tcp 10.120.245.0/24 any eq 22
+  30 permit tcp 10.250.0.0/23 any eq 22
+  1000 deny ip any any log
+line console
+  exec-timeout 10
+line vty
+  exec-timeout 10
+  access-class ACL-VTY in
+
+! ---- baseline: AAA (TACACS+, local fallback when no server answers) -----
+feature tacacs+
+tacacs-server host 10.250.0.49 key 7 &lt;TACACS-KEY-TYPE7&gt;
+tacacs-server host 10.250.1.49 key 7 &lt;TACACS-KEY-TYPE7&gt;
+aaa group server tacacs+ TACACS
+  server 10.250.0.49
+  server 10.250.1.49
+  use-vrf management
+  source-interface mgmt0
+aaa authentication login default group TACACS
+aaa authentication login console local
+aaa authorization commands default group TACACS local
+aaa accounting default group TACACS
+aaa authentication login error-enable
+username admin password 5 &lt;LOCAL-ADMIN-HASH&gt; role network-admin
+
+! ---- baseline: time, logging, SNMPv3 ----------------------------------
+clock timezone UTC 0 0
+ntp server 10.250.0.123 use-vrf management prefer
+ntp server 10.250.1.123 use-vrf management
+ntp source-interface mgmt0
+
+logging server 10.250.0.40 5 use-vrf management
+logging source-interface mgmt0
+logging timestamp milliseconds
+
+snmp-server contact noc@example.net
+snmp-server location DC1 Example colo, Example City A
+snmp-server user nms-ro network-operator auth sha &lt;SNMP-AUTH-KEY&gt; priv aes-128 &lt;SNMP-PRIV-KEY&gt;
+snmp-server host 10.250.0.162 traps version 3 priv nms-ro
+snmp-server host 10.250.0.162 use-vrf management
+snmp-server source-interface traps mgmt0
+snmp-server enable traps bgp
+
+banner motd ^
+Authorized access only. Activity is logged and monitored.
+Disconnect now if you are not an authorized user.
+^
 
 nv overlay evpn
 feature bgp
@@ -1841,7 +2195,7 @@ router bgp 65214
 ! FICTIONAL DEMO DATA: not for any real network.
 ! Template: validate against the exact Nexus model and NX-OS release before use.
 ! Fill in every &lt;placeholder&gt;. Host-gateway SVIs ship shut (migration step M4).
-! Not included: AAA/TACACS, NTP, SNMP, syslog, banners, users. Apply your own baseline.
+! Baseline included: AAA/TACACS+, NTP, syslog, SNMPv3, CoPP, SSH-only vty, banner.
 !==============================================================================
 
 hostname DC1-NXBGW-01
@@ -1849,9 +2203,68 @@ hostname DC1-NXBGW-01
 ! ---- out-of-band management (10.110.245.0/24, gateway on the firewall) ---
 vrf context management
   ip route 0.0.0.0/0 10.110.245.1
+  ip name-server 10.250.0.53
+  ip name-server 10.250.1.53
+  ip domain-name dc.example.net
 interface mgmt0
   vrf member management
   ip address 10.110.245.31/24
+
+! ---- baseline: hardening -------------------------------------------
+no feature telnet
+feature ssh
+password strength-check
+copp profile strict
+
+ip access-list ACL-VTY
+  10 permit tcp 10.110.245.0/24 any eq 22
+  20 permit tcp 10.120.245.0/24 any eq 22
+  30 permit tcp 10.250.0.0/23 any eq 22
+  1000 deny ip any any log
+line console
+  exec-timeout 10
+line vty
+  exec-timeout 10
+  access-class ACL-VTY in
+
+! ---- baseline: AAA (TACACS+, local fallback when no server answers) -----
+feature tacacs+
+tacacs-server host 10.250.0.49 key 7 &lt;TACACS-KEY-TYPE7&gt;
+tacacs-server host 10.250.1.49 key 7 &lt;TACACS-KEY-TYPE7&gt;
+aaa group server tacacs+ TACACS
+  server 10.250.0.49
+  server 10.250.1.49
+  use-vrf management
+  source-interface mgmt0
+aaa authentication login default group TACACS
+aaa authentication login console local
+aaa authorization commands default group TACACS local
+aaa accounting default group TACACS
+aaa authentication login error-enable
+username admin password 5 &lt;LOCAL-ADMIN-HASH&gt; role network-admin
+
+! ---- baseline: time, logging, SNMPv3 ----------------------------------
+clock timezone UTC 0 0
+ntp server 10.250.0.123 use-vrf management prefer
+ntp server 10.250.1.123 use-vrf management
+ntp source-interface mgmt0
+
+logging server 10.250.0.40 5 use-vrf management
+logging source-interface mgmt0
+logging timestamp milliseconds
+
+snmp-server contact noc@example.net
+snmp-server location DC1 Example colo, Example City A
+snmp-server user nms-ro network-operator auth sha &lt;SNMP-AUTH-KEY&gt; priv aes-128 &lt;SNMP-PRIV-KEY&gt;
+snmp-server host 10.250.0.162 traps version 3 priv nms-ro
+snmp-server host 10.250.0.162 use-vrf management
+snmp-server source-interface traps mgmt0
+snmp-server enable traps bgp
+
+banner motd ^
+Authorized access only. Activity is logged and monitored.
+Disconnect now if you are not an authorized user.
+^
 
 nv overlay evpn
 feature bgp
@@ -2092,7 +2505,7 @@ router bgp 65215
     neighbor 10.110.244.2
       remote-as 64512
       description AWS Direct Connect private VIF (connection 1)
-      password &lt;BGP MD5 key from Secret Server&gt;
+      password &lt;AWS-BGP-MD5-KEY&gt;          ! from the vault, same key as on the VIF
       bfd
       address-family ipv4 unicast
         route-map RM-AWS-IN in
@@ -2111,7 +2524,7 @@ router bgp 65215
 ! FICTIONAL DEMO DATA: not for any real network.
 ! Template: validate against the exact Nexus model and NX-OS release before use.
 ! Fill in every &lt;placeholder&gt;. Host-gateway SVIs ship shut (migration step M4).
-! Not included: AAA/TACACS, NTP, SNMP, syslog, banners, users. Apply your own baseline.
+! Baseline included: AAA/TACACS+, NTP, syslog, SNMPv3, CoPP, SSH-only vty, banner.
 !==============================================================================
 
 hostname DC1-NXBGW-02
@@ -2119,9 +2532,68 @@ hostname DC1-NXBGW-02
 ! ---- out-of-band management (10.110.245.0/24, gateway on the firewall) ---
 vrf context management
   ip route 0.0.0.0/0 10.110.245.1
+  ip name-server 10.250.0.53
+  ip name-server 10.250.1.53
+  ip domain-name dc.example.net
 interface mgmt0
   vrf member management
   ip address 10.110.245.32/24
+
+! ---- baseline: hardening -------------------------------------------
+no feature telnet
+feature ssh
+password strength-check
+copp profile strict
+
+ip access-list ACL-VTY
+  10 permit tcp 10.110.245.0/24 any eq 22
+  20 permit tcp 10.120.245.0/24 any eq 22
+  30 permit tcp 10.250.0.0/23 any eq 22
+  1000 deny ip any any log
+line console
+  exec-timeout 10
+line vty
+  exec-timeout 10
+  access-class ACL-VTY in
+
+! ---- baseline: AAA (TACACS+, local fallback when no server answers) -----
+feature tacacs+
+tacacs-server host 10.250.0.49 key 7 &lt;TACACS-KEY-TYPE7&gt;
+tacacs-server host 10.250.1.49 key 7 &lt;TACACS-KEY-TYPE7&gt;
+aaa group server tacacs+ TACACS
+  server 10.250.0.49
+  server 10.250.1.49
+  use-vrf management
+  source-interface mgmt0
+aaa authentication login default group TACACS
+aaa authentication login console local
+aaa authorization commands default group TACACS local
+aaa accounting default group TACACS
+aaa authentication login error-enable
+username admin password 5 &lt;LOCAL-ADMIN-HASH&gt; role network-admin
+
+! ---- baseline: time, logging, SNMPv3 ----------------------------------
+clock timezone UTC 0 0
+ntp server 10.250.0.123 use-vrf management prefer
+ntp server 10.250.1.123 use-vrf management
+ntp source-interface mgmt0
+
+logging server 10.250.0.40 5 use-vrf management
+logging source-interface mgmt0
+logging timestamp milliseconds
+
+snmp-server contact noc@example.net
+snmp-server location DC1 Example colo, Example City A
+snmp-server user nms-ro network-operator auth sha &lt;SNMP-AUTH-KEY&gt; priv aes-128 &lt;SNMP-PRIV-KEY&gt;
+snmp-server host 10.250.0.162 traps version 3 priv nms-ro
+snmp-server host 10.250.0.162 use-vrf management
+snmp-server source-interface traps mgmt0
+snmp-server enable traps bgp
+
+banner motd ^
+Authorized access only. Activity is logged and monitored.
+Disconnect now if you are not an authorized user.
+^
 
 nv overlay evpn
 feature bgp
@@ -2362,7 +2834,7 @@ router bgp 65216
     neighbor 10.110.244.10
       remote-as 64512
       description AWS Direct Connect private VIF (connection 2)
-      password &lt;BGP MD5 key from Secret Server&gt;
+      password &lt;AWS-BGP-MD5-KEY&gt;          ! from the vault, same key as on the VIF
       bfd
       address-family ipv4 unicast
         route-map RM-AWS-IN in
@@ -2381,7 +2853,7 @@ router bgp 65216
 ! FICTIONAL DEMO DATA: not for any real network.
 ! Template: validate against the exact Nexus model and NX-OS release before use.
 ! Fill in every &lt;placeholder&gt;. Host-gateway SVIs ship shut (migration step M4).
-! Not included: AAA/TACACS, NTP, SNMP, syslog, banners, users. Apply your own baseline.
+! Baseline included: AAA/TACACS+, NTP, syslog, SNMPv3, CoPP, SSH-only vty, banner.
 !==============================================================================
 
 hostname DC2-NXSP-01
@@ -2389,9 +2861,68 @@ hostname DC2-NXSP-01
 ! ---- out-of-band management (10.120.245.0/24, gateway on the firewall) ---
 vrf context management
   ip route 0.0.0.0/0 10.120.245.1
+  ip name-server 10.250.0.53
+  ip name-server 10.250.1.53
+  ip domain-name dc.example.net
 interface mgmt0
   vrf member management
   ip address 10.120.245.11/24
+
+! ---- baseline: hardening -------------------------------------------
+no feature telnet
+feature ssh
+password strength-check
+copp profile strict
+
+ip access-list ACL-VTY
+  10 permit tcp 10.110.245.0/24 any eq 22
+  20 permit tcp 10.120.245.0/24 any eq 22
+  30 permit tcp 10.250.0.0/23 any eq 22
+  1000 deny ip any any log
+line console
+  exec-timeout 10
+line vty
+  exec-timeout 10
+  access-class ACL-VTY in
+
+! ---- baseline: AAA (TACACS+, local fallback when no server answers) -----
+feature tacacs+
+tacacs-server host 10.250.0.49 key 7 &lt;TACACS-KEY-TYPE7&gt;
+tacacs-server host 10.250.1.49 key 7 &lt;TACACS-KEY-TYPE7&gt;
+aaa group server tacacs+ TACACS
+  server 10.250.0.49
+  server 10.250.1.49
+  use-vrf management
+  source-interface mgmt0
+aaa authentication login default group TACACS
+aaa authentication login console local
+aaa authorization commands default group TACACS local
+aaa accounting default group TACACS
+aaa authentication login error-enable
+username admin password 5 &lt;LOCAL-ADMIN-HASH&gt; role network-admin
+
+! ---- baseline: time, logging, SNMPv3 ----------------------------------
+clock timezone UTC 0 0
+ntp server 10.250.0.123 use-vrf management prefer
+ntp server 10.250.1.123 use-vrf management
+ntp source-interface mgmt0
+
+logging server 10.250.0.40 5 use-vrf management
+logging source-interface mgmt0
+logging timestamp milliseconds
+
+snmp-server contact noc@example.net
+snmp-server location DC2 Example colo, Example City B
+snmp-server user nms-ro network-operator auth sha &lt;SNMP-AUTH-KEY&gt; priv aes-128 &lt;SNMP-PRIV-KEY&gt;
+snmp-server host 10.250.0.162 traps version 3 priv nms-ro
+snmp-server host 10.250.0.162 use-vrf management
+snmp-server source-interface traps mgmt0
+snmp-server enable traps bgp
+
+banner motd ^
+Authorized access only. Activity is logged and monitored.
+Disconnect now if you are not an authorized user.
+^
 
 nv overlay evpn
 feature bgp
@@ -2549,7 +3080,7 @@ router bgp 65220
 ! FICTIONAL DEMO DATA: not for any real network.
 ! Template: validate against the exact Nexus model and NX-OS release before use.
 ! Fill in every &lt;placeholder&gt;. Host-gateway SVIs ship shut (migration step M4).
-! Not included: AAA/TACACS, NTP, SNMP, syslog, banners, users. Apply your own baseline.
+! Baseline included: AAA/TACACS+, NTP, syslog, SNMPv3, CoPP, SSH-only vty, banner.
 !==============================================================================
 
 hostname DC2-NXSP-02
@@ -2557,9 +3088,68 @@ hostname DC2-NXSP-02
 ! ---- out-of-band management (10.120.245.0/24, gateway on the firewall) ---
 vrf context management
   ip route 0.0.0.0/0 10.120.245.1
+  ip name-server 10.250.0.53
+  ip name-server 10.250.1.53
+  ip domain-name dc.example.net
 interface mgmt0
   vrf member management
   ip address 10.120.245.12/24
+
+! ---- baseline: hardening -------------------------------------------
+no feature telnet
+feature ssh
+password strength-check
+copp profile strict
+
+ip access-list ACL-VTY
+  10 permit tcp 10.110.245.0/24 any eq 22
+  20 permit tcp 10.120.245.0/24 any eq 22
+  30 permit tcp 10.250.0.0/23 any eq 22
+  1000 deny ip any any log
+line console
+  exec-timeout 10
+line vty
+  exec-timeout 10
+  access-class ACL-VTY in
+
+! ---- baseline: AAA (TACACS+, local fallback when no server answers) -----
+feature tacacs+
+tacacs-server host 10.250.0.49 key 7 &lt;TACACS-KEY-TYPE7&gt;
+tacacs-server host 10.250.1.49 key 7 &lt;TACACS-KEY-TYPE7&gt;
+aaa group server tacacs+ TACACS
+  server 10.250.0.49
+  server 10.250.1.49
+  use-vrf management
+  source-interface mgmt0
+aaa authentication login default group TACACS
+aaa authentication login console local
+aaa authorization commands default group TACACS local
+aaa accounting default group TACACS
+aaa authentication login error-enable
+username admin password 5 &lt;LOCAL-ADMIN-HASH&gt; role network-admin
+
+! ---- baseline: time, logging, SNMPv3 ----------------------------------
+clock timezone UTC 0 0
+ntp server 10.250.0.123 use-vrf management prefer
+ntp server 10.250.1.123 use-vrf management
+ntp source-interface mgmt0
+
+logging server 10.250.0.40 5 use-vrf management
+logging source-interface mgmt0
+logging timestamp milliseconds
+
+snmp-server contact noc@example.net
+snmp-server location DC2 Example colo, Example City B
+snmp-server user nms-ro network-operator auth sha &lt;SNMP-AUTH-KEY&gt; priv aes-128 &lt;SNMP-PRIV-KEY&gt;
+snmp-server host 10.250.0.162 traps version 3 priv nms-ro
+snmp-server host 10.250.0.162 use-vrf management
+snmp-server source-interface traps mgmt0
+snmp-server enable traps bgp
+
+banner motd ^
+Authorized access only. Activity is logged and monitored.
+Disconnect now if you are not an authorized user.
+^
 
 nv overlay evpn
 feature bgp
@@ -2717,7 +3307,7 @@ router bgp 65220
 ! FICTIONAL DEMO DATA: not for any real network.
 ! Template: validate against the exact Nexus model and NX-OS release before use.
 ! Fill in every &lt;placeholder&gt;. Host-gateway SVIs ship shut (migration step M4).
-! Not included: AAA/TACACS, NTP, SNMP, syslog, banners, users. Apply your own baseline.
+! Baseline included: AAA/TACACS+, NTP, syslog, SNMPv3, CoPP, SSH-only vty, banner.
 !==============================================================================
 
 hostname DC2-NXLF-01
@@ -2725,9 +3315,68 @@ hostname DC2-NXLF-01
 ! ---- out-of-band management (10.120.245.0/24, gateway on the firewall) ---
 vrf context management
   ip route 0.0.0.0/0 10.120.245.1
+  ip name-server 10.250.0.53
+  ip name-server 10.250.1.53
+  ip domain-name dc.example.net
 interface mgmt0
   vrf member management
   ip address 10.120.245.21/24
+
+! ---- baseline: hardening -------------------------------------------
+no feature telnet
+feature ssh
+password strength-check
+copp profile strict
+
+ip access-list ACL-VTY
+  10 permit tcp 10.110.245.0/24 any eq 22
+  20 permit tcp 10.120.245.0/24 any eq 22
+  30 permit tcp 10.250.0.0/23 any eq 22
+  1000 deny ip any any log
+line console
+  exec-timeout 10
+line vty
+  exec-timeout 10
+  access-class ACL-VTY in
+
+! ---- baseline: AAA (TACACS+, local fallback when no server answers) -----
+feature tacacs+
+tacacs-server host 10.250.0.49 key 7 &lt;TACACS-KEY-TYPE7&gt;
+tacacs-server host 10.250.1.49 key 7 &lt;TACACS-KEY-TYPE7&gt;
+aaa group server tacacs+ TACACS
+  server 10.250.0.49
+  server 10.250.1.49
+  use-vrf management
+  source-interface mgmt0
+aaa authentication login default group TACACS
+aaa authentication login console local
+aaa authorization commands default group TACACS local
+aaa accounting default group TACACS
+aaa authentication login error-enable
+username admin password 5 &lt;LOCAL-ADMIN-HASH&gt; role network-admin
+
+! ---- baseline: time, logging, SNMPv3 ----------------------------------
+clock timezone UTC 0 0
+ntp server 10.250.0.123 use-vrf management prefer
+ntp server 10.250.1.123 use-vrf management
+ntp source-interface mgmt0
+
+logging server 10.250.0.40 5 use-vrf management
+logging source-interface mgmt0
+logging timestamp milliseconds
+
+snmp-server contact noc@example.net
+snmp-server location DC2 Example colo, Example City B
+snmp-server user nms-ro network-operator auth sha &lt;SNMP-AUTH-KEY&gt; priv aes-128 &lt;SNMP-PRIV-KEY&gt;
+snmp-server host 10.250.0.162 traps version 3 priv nms-ro
+snmp-server host 10.250.0.162 use-vrf management
+snmp-server source-interface traps mgmt0
+snmp-server enable traps bgp
+
+banner motd ^
+Authorized access only. Activity is logged and monitored.
+Disconnect now if you are not an authorized user.
+^
 
 nv overlay evpn
 feature bgp
@@ -2985,7 +3634,7 @@ router bgp 65221
 ! FICTIONAL DEMO DATA: not for any real network.
 ! Template: validate against the exact Nexus model and NX-OS release before use.
 ! Fill in every &lt;placeholder&gt;. Host-gateway SVIs ship shut (migration step M4).
-! Not included: AAA/TACACS, NTP, SNMP, syslog, banners, users. Apply your own baseline.
+! Baseline included: AAA/TACACS+, NTP, syslog, SNMPv3, CoPP, SSH-only vty, banner.
 !==============================================================================
 
 hostname DC2-NXLF-02
@@ -2993,9 +3642,68 @@ hostname DC2-NXLF-02
 ! ---- out-of-band management (10.120.245.0/24, gateway on the firewall) ---
 vrf context management
   ip route 0.0.0.0/0 10.120.245.1
+  ip name-server 10.250.0.53
+  ip name-server 10.250.1.53
+  ip domain-name dc.example.net
 interface mgmt0
   vrf member management
   ip address 10.120.245.22/24
+
+! ---- baseline: hardening -------------------------------------------
+no feature telnet
+feature ssh
+password strength-check
+copp profile strict
+
+ip access-list ACL-VTY
+  10 permit tcp 10.110.245.0/24 any eq 22
+  20 permit tcp 10.120.245.0/24 any eq 22
+  30 permit tcp 10.250.0.0/23 any eq 22
+  1000 deny ip any any log
+line console
+  exec-timeout 10
+line vty
+  exec-timeout 10
+  access-class ACL-VTY in
+
+! ---- baseline: AAA (TACACS+, local fallback when no server answers) -----
+feature tacacs+
+tacacs-server host 10.250.0.49 key 7 &lt;TACACS-KEY-TYPE7&gt;
+tacacs-server host 10.250.1.49 key 7 &lt;TACACS-KEY-TYPE7&gt;
+aaa group server tacacs+ TACACS
+  server 10.250.0.49
+  server 10.250.1.49
+  use-vrf management
+  source-interface mgmt0
+aaa authentication login default group TACACS
+aaa authentication login console local
+aaa authorization commands default group TACACS local
+aaa accounting default group TACACS
+aaa authentication login error-enable
+username admin password 5 &lt;LOCAL-ADMIN-HASH&gt; role network-admin
+
+! ---- baseline: time, logging, SNMPv3 ----------------------------------
+clock timezone UTC 0 0
+ntp server 10.250.0.123 use-vrf management prefer
+ntp server 10.250.1.123 use-vrf management
+ntp source-interface mgmt0
+
+logging server 10.250.0.40 5 use-vrf management
+logging source-interface mgmt0
+logging timestamp milliseconds
+
+snmp-server contact noc@example.net
+snmp-server location DC2 Example colo, Example City B
+snmp-server user nms-ro network-operator auth sha &lt;SNMP-AUTH-KEY&gt; priv aes-128 &lt;SNMP-PRIV-KEY&gt;
+snmp-server host 10.250.0.162 traps version 3 priv nms-ro
+snmp-server host 10.250.0.162 use-vrf management
+snmp-server source-interface traps mgmt0
+snmp-server enable traps bgp
+
+banner motd ^
+Authorized access only. Activity is logged and monitored.
+Disconnect now if you are not an authorized user.
+^
 
 nv overlay evpn
 feature bgp
@@ -3253,7 +3961,7 @@ router bgp 65222
 ! FICTIONAL DEMO DATA: not for any real network.
 ! Template: validate against the exact Nexus model and NX-OS release before use.
 ! Fill in every &lt;placeholder&gt;. Host-gateway SVIs ship shut (migration step M4).
-! Not included: AAA/TACACS, NTP, SNMP, syslog, banners, users. Apply your own baseline.
+! Baseline included: AAA/TACACS+, NTP, syslog, SNMPv3, CoPP, SSH-only vty, banner.
 !==============================================================================
 
 hostname DC2-NXLF-03
@@ -3261,9 +3969,68 @@ hostname DC2-NXLF-03
 ! ---- out-of-band management (10.120.245.0/24, gateway on the firewall) ---
 vrf context management
   ip route 0.0.0.0/0 10.120.245.1
+  ip name-server 10.250.0.53
+  ip name-server 10.250.1.53
+  ip domain-name dc.example.net
 interface mgmt0
   vrf member management
   ip address 10.120.245.23/24
+
+! ---- baseline: hardening -------------------------------------------
+no feature telnet
+feature ssh
+password strength-check
+copp profile strict
+
+ip access-list ACL-VTY
+  10 permit tcp 10.110.245.0/24 any eq 22
+  20 permit tcp 10.120.245.0/24 any eq 22
+  30 permit tcp 10.250.0.0/23 any eq 22
+  1000 deny ip any any log
+line console
+  exec-timeout 10
+line vty
+  exec-timeout 10
+  access-class ACL-VTY in
+
+! ---- baseline: AAA (TACACS+, local fallback when no server answers) -----
+feature tacacs+
+tacacs-server host 10.250.0.49 key 7 &lt;TACACS-KEY-TYPE7&gt;
+tacacs-server host 10.250.1.49 key 7 &lt;TACACS-KEY-TYPE7&gt;
+aaa group server tacacs+ TACACS
+  server 10.250.0.49
+  server 10.250.1.49
+  use-vrf management
+  source-interface mgmt0
+aaa authentication login default group TACACS
+aaa authentication login console local
+aaa authorization commands default group TACACS local
+aaa accounting default group TACACS
+aaa authentication login error-enable
+username admin password 5 &lt;LOCAL-ADMIN-HASH&gt; role network-admin
+
+! ---- baseline: time, logging, SNMPv3 ----------------------------------
+clock timezone UTC 0 0
+ntp server 10.250.0.123 use-vrf management prefer
+ntp server 10.250.1.123 use-vrf management
+ntp source-interface mgmt0
+
+logging server 10.250.0.40 5 use-vrf management
+logging source-interface mgmt0
+logging timestamp milliseconds
+
+snmp-server contact noc@example.net
+snmp-server location DC2 Example colo, Example City B
+snmp-server user nms-ro network-operator auth sha &lt;SNMP-AUTH-KEY&gt; priv aes-128 &lt;SNMP-PRIV-KEY&gt;
+snmp-server host 10.250.0.162 traps version 3 priv nms-ro
+snmp-server host 10.250.0.162 use-vrf management
+snmp-server source-interface traps mgmt0
+snmp-server enable traps bgp
+
+banner motd ^
+Authorized access only. Activity is logged and monitored.
+Disconnect now if you are not an authorized user.
+^
 
 nv overlay evpn
 feature bgp
@@ -3620,7 +4387,7 @@ router bgp 65223
 ! FICTIONAL DEMO DATA: not for any real network.
 ! Template: validate against the exact Nexus model and NX-OS release before use.
 ! Fill in every &lt;placeholder&gt;. Host-gateway SVIs ship shut (migration step M4).
-! Not included: AAA/TACACS, NTP, SNMP, syslog, banners, users. Apply your own baseline.
+! Baseline included: AAA/TACACS+, NTP, syslog, SNMPv3, CoPP, SSH-only vty, banner.
 !==============================================================================
 
 hostname DC2-NXLF-04
@@ -3628,9 +4395,68 @@ hostname DC2-NXLF-04
 ! ---- out-of-band management (10.120.245.0/24, gateway on the firewall) ---
 vrf context management
   ip route 0.0.0.0/0 10.120.245.1
+  ip name-server 10.250.0.53
+  ip name-server 10.250.1.53
+  ip domain-name dc.example.net
 interface mgmt0
   vrf member management
   ip address 10.120.245.24/24
+
+! ---- baseline: hardening -------------------------------------------
+no feature telnet
+feature ssh
+password strength-check
+copp profile strict
+
+ip access-list ACL-VTY
+  10 permit tcp 10.110.245.0/24 any eq 22
+  20 permit tcp 10.120.245.0/24 any eq 22
+  30 permit tcp 10.250.0.0/23 any eq 22
+  1000 deny ip any any log
+line console
+  exec-timeout 10
+line vty
+  exec-timeout 10
+  access-class ACL-VTY in
+
+! ---- baseline: AAA (TACACS+, local fallback when no server answers) -----
+feature tacacs+
+tacacs-server host 10.250.0.49 key 7 &lt;TACACS-KEY-TYPE7&gt;
+tacacs-server host 10.250.1.49 key 7 &lt;TACACS-KEY-TYPE7&gt;
+aaa group server tacacs+ TACACS
+  server 10.250.0.49
+  server 10.250.1.49
+  use-vrf management
+  source-interface mgmt0
+aaa authentication login default group TACACS
+aaa authentication login console local
+aaa authorization commands default group TACACS local
+aaa accounting default group TACACS
+aaa authentication login error-enable
+username admin password 5 &lt;LOCAL-ADMIN-HASH&gt; role network-admin
+
+! ---- baseline: time, logging, SNMPv3 ----------------------------------
+clock timezone UTC 0 0
+ntp server 10.250.0.123 use-vrf management prefer
+ntp server 10.250.1.123 use-vrf management
+ntp source-interface mgmt0
+
+logging server 10.250.0.40 5 use-vrf management
+logging source-interface mgmt0
+logging timestamp milliseconds
+
+snmp-server contact noc@example.net
+snmp-server location DC2 Example colo, Example City B
+snmp-server user nms-ro network-operator auth sha &lt;SNMP-AUTH-KEY&gt; priv aes-128 &lt;SNMP-PRIV-KEY&gt;
+snmp-server host 10.250.0.162 traps version 3 priv nms-ro
+snmp-server host 10.250.0.162 use-vrf management
+snmp-server source-interface traps mgmt0
+snmp-server enable traps bgp
+
+banner motd ^
+Authorized access only. Activity is logged and monitored.
+Disconnect now if you are not an authorized user.
+^
 
 nv overlay evpn
 feature bgp
@@ -3987,7 +4813,7 @@ router bgp 65224
 ! FICTIONAL DEMO DATA: not for any real network.
 ! Template: validate against the exact Nexus model and NX-OS release before use.
 ! Fill in every &lt;placeholder&gt;. Host-gateway SVIs ship shut (migration step M4).
-! Not included: AAA/TACACS, NTP, SNMP, syslog, banners, users. Apply your own baseline.
+! Baseline included: AAA/TACACS+, NTP, syslog, SNMPv3, CoPP, SSH-only vty, banner.
 !==============================================================================
 
 hostname DC2-NXBGW-01
@@ -3995,9 +4821,68 @@ hostname DC2-NXBGW-01
 ! ---- out-of-band management (10.120.245.0/24, gateway on the firewall) ---
 vrf context management
   ip route 0.0.0.0/0 10.120.245.1
+  ip name-server 10.250.0.53
+  ip name-server 10.250.1.53
+  ip domain-name dc.example.net
 interface mgmt0
   vrf member management
   ip address 10.120.245.31/24
+
+! ---- baseline: hardening -------------------------------------------
+no feature telnet
+feature ssh
+password strength-check
+copp profile strict
+
+ip access-list ACL-VTY
+  10 permit tcp 10.110.245.0/24 any eq 22
+  20 permit tcp 10.120.245.0/24 any eq 22
+  30 permit tcp 10.250.0.0/23 any eq 22
+  1000 deny ip any any log
+line console
+  exec-timeout 10
+line vty
+  exec-timeout 10
+  access-class ACL-VTY in
+
+! ---- baseline: AAA (TACACS+, local fallback when no server answers) -----
+feature tacacs+
+tacacs-server host 10.250.0.49 key 7 &lt;TACACS-KEY-TYPE7&gt;
+tacacs-server host 10.250.1.49 key 7 &lt;TACACS-KEY-TYPE7&gt;
+aaa group server tacacs+ TACACS
+  server 10.250.0.49
+  server 10.250.1.49
+  use-vrf management
+  source-interface mgmt0
+aaa authentication login default group TACACS
+aaa authentication login console local
+aaa authorization commands default group TACACS local
+aaa accounting default group TACACS
+aaa authentication login error-enable
+username admin password 5 &lt;LOCAL-ADMIN-HASH&gt; role network-admin
+
+! ---- baseline: time, logging, SNMPv3 ----------------------------------
+clock timezone UTC 0 0
+ntp server 10.250.0.123 use-vrf management prefer
+ntp server 10.250.1.123 use-vrf management
+ntp source-interface mgmt0
+
+logging server 10.250.0.40 5 use-vrf management
+logging source-interface mgmt0
+logging timestamp milliseconds
+
+snmp-server contact noc@example.net
+snmp-server location DC2 Example colo, Example City B
+snmp-server user nms-ro network-operator auth sha &lt;SNMP-AUTH-KEY&gt; priv aes-128 &lt;SNMP-PRIV-KEY&gt;
+snmp-server host 10.250.0.162 traps version 3 priv nms-ro
+snmp-server host 10.250.0.162 use-vrf management
+snmp-server source-interface traps mgmt0
+snmp-server enable traps bgp
+
+banner motd ^
+Authorized access only. Activity is logged and monitored.
+Disconnect now if you are not an authorized user.
+^
 
 nv overlay evpn
 feature bgp
@@ -4238,7 +5123,7 @@ router bgp 65225
     neighbor 10.120.244.2
       remote-as 64512
       description AWS Direct Connect private VIF (connection 1)
-      password &lt;BGP MD5 key from Secret Server&gt;
+      password &lt;AWS-BGP-MD5-KEY&gt;          ! from the vault, same key as on the VIF
       bfd
       address-family ipv4 unicast
         route-map RM-AWS-IN in
@@ -4257,7 +5142,7 @@ router bgp 65225
 ! FICTIONAL DEMO DATA: not for any real network.
 ! Template: validate against the exact Nexus model and NX-OS release before use.
 ! Fill in every &lt;placeholder&gt;. Host-gateway SVIs ship shut (migration step M4).
-! Not included: AAA/TACACS, NTP, SNMP, syslog, banners, users. Apply your own baseline.
+! Baseline included: AAA/TACACS+, NTP, syslog, SNMPv3, CoPP, SSH-only vty, banner.
 !==============================================================================
 
 hostname DC2-NXBGW-02
@@ -4265,9 +5150,68 @@ hostname DC2-NXBGW-02
 ! ---- out-of-band management (10.120.245.0/24, gateway on the firewall) ---
 vrf context management
   ip route 0.0.0.0/0 10.120.245.1
+  ip name-server 10.250.0.53
+  ip name-server 10.250.1.53
+  ip domain-name dc.example.net
 interface mgmt0
   vrf member management
   ip address 10.120.245.32/24
+
+! ---- baseline: hardening -------------------------------------------
+no feature telnet
+feature ssh
+password strength-check
+copp profile strict
+
+ip access-list ACL-VTY
+  10 permit tcp 10.110.245.0/24 any eq 22
+  20 permit tcp 10.120.245.0/24 any eq 22
+  30 permit tcp 10.250.0.0/23 any eq 22
+  1000 deny ip any any log
+line console
+  exec-timeout 10
+line vty
+  exec-timeout 10
+  access-class ACL-VTY in
+
+! ---- baseline: AAA (TACACS+, local fallback when no server answers) -----
+feature tacacs+
+tacacs-server host 10.250.0.49 key 7 &lt;TACACS-KEY-TYPE7&gt;
+tacacs-server host 10.250.1.49 key 7 &lt;TACACS-KEY-TYPE7&gt;
+aaa group server tacacs+ TACACS
+  server 10.250.0.49
+  server 10.250.1.49
+  use-vrf management
+  source-interface mgmt0
+aaa authentication login default group TACACS
+aaa authentication login console local
+aaa authorization commands default group TACACS local
+aaa accounting default group TACACS
+aaa authentication login error-enable
+username admin password 5 &lt;LOCAL-ADMIN-HASH&gt; role network-admin
+
+! ---- baseline: time, logging, SNMPv3 ----------------------------------
+clock timezone UTC 0 0
+ntp server 10.250.0.123 use-vrf management prefer
+ntp server 10.250.1.123 use-vrf management
+ntp source-interface mgmt0
+
+logging server 10.250.0.40 5 use-vrf management
+logging source-interface mgmt0
+logging timestamp milliseconds
+
+snmp-server contact noc@example.net
+snmp-server location DC2 Example colo, Example City B
+snmp-server user nms-ro network-operator auth sha &lt;SNMP-AUTH-KEY&gt; priv aes-128 &lt;SNMP-PRIV-KEY&gt;
+snmp-server host 10.250.0.162 traps version 3 priv nms-ro
+snmp-server host 10.250.0.162 use-vrf management
+snmp-server source-interface traps mgmt0
+snmp-server enable traps bgp
+
+banner motd ^
+Authorized access only. Activity is logged and monitored.
+Disconnect now if you are not an authorized user.
+^
 
 nv overlay evpn
 feature bgp
@@ -4508,7 +5452,7 @@ router bgp 65226
     neighbor 10.120.244.10
       remote-as 64512
       description AWS Direct Connect private VIF (connection 2)
-      password &lt;BGP MD5 key from Secret Server&gt;
+      password &lt;AWS-BGP-MD5-KEY&gt;          ! from the vault, same key as on the VIF
       bfd
       address-family ipv4 unicast
         route-map RM-AWS-IN in
