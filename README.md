@@ -22,7 +22,7 @@ Standard library only (Python 3.9+).
 | Underlay | eBGP IPv4 on /31 links, BFD, MTU 9216. Spines share an ASN per site; every leaf and BGW has its own |
 | Overlay | MP-BGP L2VPN EVPN, eBGP between loopbacks; spines are route servers (`retain route-target all`, next-hop unchanged) |
 | Hosts | Distributed anycast gateway, symmetric IRB, vPC with `advertise-pip` / `advertise virtual-rmac`, ARP suppression |
-| Multi-Site | Anycast BGWs, fabric/DCI tracking, two DCI carriers in a full mesh (or one circuit per BGW), only BGW loopbacks in the DCI underlay |
+| Multi-Site | Dedicated anycast BGWs (no endpoints, no vPC), fabric/DCI tracking, two DCI carriers in a full mesh (or one circuit per BGW), only BGW loopbacks in the DCI underlay |
 | Edge | Routed /29 transits to the Palo Alto HA pair, eBGP with BFD; default route only, never across the DCI |
 | Cloud | AWS Direct Connect and Azure ExpressRoute on the BGWs in the tenant VRF, strict prefix allowlists |
 
@@ -49,6 +49,23 @@ python3 -m fabric_design.build private/<name>.json --out private/<name>
 The data file holds everything environment-specific: site codes and /16s, ASNs, VLANs, firewall names and
 ports, cloud allowlists and the workbook narrative.
 
+### Border gateways
+
+The BGWs follow Cisco's standard Multi-Site model: two dedicated anycast BGWs per site, sharing the site's
+Multi-Site VIP, all forwarding. They carry routed links only, with no endpoints, access ports, vPC or
+BGW-local VLANs. That keeps the site scalable to more BGWs, and the tests enforce it. vPC BGWs only make
+sense when hosts must dual-home to the border; BGWs on the spines overload them.
+
+`"platforms": {"bgw": ...}` names the BGW model in the config headers and the workbook (the demo uses
+`N9K-C93180YC-FX3`). The port plan assumes 48 x SFP28 + 6 x QSFP28:
+
+| Port | Use |
+|---|---|
+| Eth1/1, Eth1/2 | AWS Direct Connect, Azure ExpressRoute (routed subinterfaces in VRF TRUST, one port per provider) |
+| Eth1/49-50 | Spines (fabric tracking) |
+| Eth1/51-52 | DCI carrier A, carrier B in full mesh (DCI tracking) |
+| Eth1/53-54 | Spare for DCI growth |
+
 ### DCI
 
 `"dci": {"mode": ...}` in the data file picks the DCI circuits. Both modes use two carriers; carrier A is
@@ -57,7 +74,7 @@ addressed from the first site's 10.x.246.0/24 and carrier B from the second's.
 | Mode | Circuits | Ports | What a single failure does |
 |---|---|---|---|
 | `pair` (default) | 2: BGW-01 to BGW-01 on carrier A, BGW-02 to BGW-02 on carrier B | Eth1/51 | A carrier or circuit loss takes one BGW per site out of Multi-Site (DCI tracking isolates it); a BGW loss also isolates its partner at the other site. Half the BGWs remain, with no further redundancy |
-| `full-mesh` (demo) | 4: carrier A joins 01-01 and 02-02, carrier B crosses over (01-02, 02-01) | Eth1/51 carrier A, Eth1/53 carrier B | Every BGW still in service keeps a circuit to a remote BGW still in service, whether a carrier, a circuit or a BGW fails |
+| `full-mesh` (demo) | 4: carrier A joins 01-01 and 02-02, carrier B crosses over (01-02, 02-01) | Eth1/51 carrier A, Eth1/52 carrier B | Every BGW still in service keeps a circuit to a remote BGW still in service, whether a carrier, a circuit or a BGW fails |
 
 The tests fail each carrier, circuit and BGW in turn and check exactly that.
 
