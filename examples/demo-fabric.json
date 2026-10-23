@@ -127,6 +127,9 @@
   "legacy": {
     "vlan": 99
   },
+  "dci": {
+    "mode": "full-mesh"
+  },
   "cloud": {
     "aws_asn": 64512,
     "azure_asn": 12076,
@@ -222,7 +225,7 @@
       ],
       "outro": "<p>VLAN N uses 10.110.N.0/24 at DC1 and 10.120.N.0/24 at DC2. The VNI numbering builds on it (§6).</p>"
     },
-    "topology_caption": "Per site: 2 spines (EVPN route servers), 4 leafs in two vPC pairs (LF-03/04 face the firewalls) and 2 Multi-Site BGWs. Carrier A joins the BGW-01s and carrier B the BGW-02s.",
+    "topology_caption": "Per site: 2 spines (EVPN route servers), 4 leafs in two vPC pairs (LF-03/04 face the firewalls) and 2 Multi-Site BGWs. The DCI is a full mesh: carrier A (solid) joins the BGW-01s and the BGW-02s, carrier B (dashed) crosses over, so every BGW has one circuit on each carrier.",
     "decisions": [
       [
         "D1",
@@ -276,8 +279,8 @@
       [
         "D8",
         "DCI",
-        "Two carriers, one per BGW pair; only BGW loopbacks in the DCI underlay",
-        "Each site stays its own failure domain.",
+        "Two carriers in a full mesh: every BGW has one circuit per carrier, to a different remote BGW; only BGW loopbacks in the DCI underlay",
+        "No single carrier, circuit or BGW failure isolates a BGW, and each site stays its own failure domain.",
         "Recommended"
       ],
       [
@@ -416,8 +419,18 @@
         "<code>show ip route</code>"
       ],
       [
+        "DCI carrier A",
+        "Every BGW keeps its carrier B circuit; all four BGWs stay in service at half the DCI capacity",
+        "<code>show nve multisite dci-links</code>, <code>show bgp l2vpn evpn summary</code>"
+      ],
+      [
+        "One DCI circuit (DC1-BGW-01 to DC2-BGW-01)",
+        "Both BGW-01s stay in service on carrier B; their loopbacks reroute through the remote BGW-02 and fabric",
+        "<code>show ip route 10.120.240.21</code> on DC1-NXBGW-01"
+      ],
+      [
         "BGW-01",
-        "DCI traffic moves to BGW-02 / carrier B",
+        "The remote BGWs keep a circuit to BGW-02; DCI traffic moves to BGW-02 through the Multi-Site VIP",
         "<code>show nve multisite dci-links</code>"
       ],
       [
@@ -433,7 +446,7 @@
       ],
       [
         "Carriers",
-        "DCI and cloud circuits, VLAN IDs, MTU."
+        "DCI circuits (four for the full mesh, two per carrier), cloud circuits, VLAN IDs, MTU."
       ]
     ]
   }

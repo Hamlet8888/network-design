@@ -76,6 +76,17 @@ class ValidateTest(unittest.TestCase):
     def test_legacy_core_ip_on_border_leaf_svi(self):
         self.rejects(lambda d: d["sites"][1].update(legacy_core_ip="10.120.99.11"), "border-leaf SVI")
 
+    def test_unknown_dci_mode(self):
+        self.rejects(lambda d: d.update(dci={"mode": "ring"}), "dci mode 'ring'")
+
+    def test_dci_mode_defaults_to_pair(self):
+        data = copy.deepcopy(self.data)
+        data.pop("dci", None)
+        build.validate(data)
+        build.load(data)
+        self.assertEqual(build.DCI_MODE, "pair")
+        self.assertEqual(len(build.dci_links()), 2)
+
     def test_all_errors_reported_together(self):
         def two(d):
             d["sites"][1]["asn"]["fw"] = 65217
