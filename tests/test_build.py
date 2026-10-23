@@ -92,6 +92,16 @@ class DemoFabricTest(unittest.TestCase):
         for key, devs in links.items():
             self.assertEqual(len(devs), 2, key)
 
+    def test_dci_option_diagrams(self):
+        for mode, circuits in (("pair", len(build.bgws())), ("full-mesh", 2 * len(build.bgws()))):
+            svg = (self.out / "diagrams" / f"topology-{mode}.svg").read_text()
+            self.assertTrue(svg.startswith('<svg xmlns="http://www.w3.org/2000/svg"'), mode)
+            self.assertIn("<style>", svg)
+            # DCI circuits are the dci-class lines outside the legend
+            body = svg.split('<g class="legend">')[0]
+            self.assertEqual(body.count('class="dci"'), circuits, mode)
+            self.assertIn(f"{circuits} circuits", svg)
+
     def test_output_is_deterministic(self):
         with tempfile.TemporaryDirectory() as again:
             build.main([str(DEMO), "--out", again])

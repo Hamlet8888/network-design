@@ -1508,7 +1508,15 @@ def site_svg(site, x0):
     return "".join(parts), bx, by
 
 
-def topology_svg():
+def topology_svg(mode=None, title=None):
+    """The two-site drawing. mode draws the DCI as "pair" or "full-mesh" instead of the configured mode."""
+    global DCI_MODE
+    if mode and mode != DCI_MODE:
+        saved, DCI_MODE = DCI_MODE, mode
+        try:
+            return topology_svg(title=title)
+        finally:
+            DCI_MODE = saved
     W, extra = svg_geometry()
     mid = W + 40
     lvd, lbx, lby = site_svg(A(), 20)
@@ -1538,8 +1546,42 @@ def topology_svg():
               f'<line x1="700" y1="{ly}" x2="740" y2="{ly}" class="dci"/><text x="748" y="{ly + 4}">DCI (eBGP)</text>'
               f'<line x1="880" y1="{ly}" x2="920" y2="{ly}" class="ha"/><text x="928" y="{ly + 4}">HA link</text>'
               f'<line x1="1020" y1="{ly}" x2="1060" y2="{ly}" class="cl"/><text x="1068" y="{ly + 4}">AWS / Azure (eBGP)</text></g>')
+    head = f'<text x="20" y="28" class="pt">{esc(title)}</text>' if title else ""
     return (f'<svg viewBox="0 0 {2 * W + 80} {835 + extra}" role="img" aria-label="{A()} and {B()} EVPN Multi-Site topology" class="topo">'
-            f'{lvd}{sac}{"".join(dci)}{legend}</svg>')
+            f'{head}{lvd}{sac}{"".join(dci)}{legend}</svg>')
+
+
+DCI_OPTIONS = {
+    "full-mesh": ("Full-mesh DCI", "each BGW has one circuit on each carrier, to a different remote BGW",
+                  "Losing a carrier, a circuit or a BGW leaves every surviving BGW in Multi-Site"),
+    "pair": ("Pair DCI", "each BGW has one circuit, to its namesake at the other site",
+             "Losing a carrier or a circuit takes a BGW out of Multi-Site at each site; losing a BGW also "
+             "isolates its partner"),
+}
+
+
+def dci_option_title(mode):
+    name, how, _ = DCI_OPTIONS[mode]
+    n = len(bgws()) * (2 if mode == "full-mesh" else 1)
+    return f"{A()}–{B()} · {name}: {n} circuits, {how}"
+
+
+def standalone_svg(mode):
+    """A self-contained SVG file of the topology with the given DCI option (styles inlined)."""
+    css = PAGE[PAGE.index("<style>") + 7:PAGE.index("</style>")]
+    svg = topology_svg(mode, dci_option_title(mode))
+    svg = svg.replace("<svg ", '<svg xmlns="http://www.w3.org/2000/svg" style="font-family:-apple-system,'
+                      'BlinkMacSystemFont,&quot;Segoe UI&quot;,Inter,Roboto,sans-serif" ', 1)
+    i = svg.index(">") + 1
+    return (svg[:i] + f"<style>{css}</style>" + '<rect width="100%" height="100%" style="fill:var(--bg)"/>'
+            + svg[i:] + "\n")
+
+
+def write_diagrams(outdir):
+    outdir.mkdir(exist_ok=True)
+    for mode in DCI_OPTIONS:
+        (outdir / f"topology-{mode}.svg").write_text(standalone_svg(mode), encoding="utf-8")
+    return len(DCI_OPTIONS)
 
 
 # ---------------------------------------------------------------------------
@@ -1637,8 +1679,15 @@ def build():
         ["PL-CLOUD-AWS", ", ".join(mono(n) for n in CLOUD_AWS)],
         ["PL-CLOUD-AZURE", ", ".join(mono(n) for n in CLOUD_AZURE)],
     ])
+    options = []
+    for mode, (name, how, failure) in DCI_OPTIONS.items():
+        chosen = " (this design)" if mode == DCI_MODE else ""
+        options.append(f'<figure>{topology_svg(mode, dci_option_title(mode))}<figcaption><b>{name}{chosen}.</b> '
+                       f'{failure}. Same drawing as <a href="diagrams/topology-{mode}.svg">diagrams/topology-{mode}.svg</a>.'
+                       '</figcaption></figure>')
     sec.append(("multisite", "8. Multi-Site, DCI and cloud",
-                "\n" + table(["Item", a, b], ms_rows) + "\n" + ms["body"] + "\n" + allow + "\n" + ms["allowlist_note"] + "\n"))
+                "\n" + table(["Item", a, b], ms_rows) + "\n" + ms["body"] + "\n" + allow + "\n" + ms["allowlist_note"] + "\n"
+                + "<h3>DCI options compared</h3>" + "".join(options) + "\n"))
 
     cfgs = []
     for site in SITE_ORDER:
@@ -1696,6 +1745,8 @@ def main(argv=None):
     print("wrote", len(files), "files to", args.out / "configs")
     n = write_checks(args.out / "checks")
     print("wrote", n, "checks to", args.out / "checks")
+    write_diagrams(args.out / "diagrams")
+    print("wrote", len(DCI_OPTIONS), "DCI option diagrams to", args.out / "diagrams")
     return 0
 
 
