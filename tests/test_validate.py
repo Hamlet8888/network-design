@@ -104,6 +104,22 @@ class ValidateTest(unittest.TestCase):
             self.assertIn("Not included: AAA/TACACS", txt)
             self.assertNotIn("feature tacacs+", txt)
 
+    def test_topology_limits(self):
+        self.rejects(lambda d: d.update(topology={"spines": 5}), "topology spines must be 2-4")
+        self.rejects(lambda d: d.update(topology={"bgws": 3}), "bgws must be even")
+        self.rejects(lambda d: d.update(topology={"leaf_pairs": 1}), "topology leaf_pairs must be 2-5")
+
+    def test_topology_needs_matching_asns_and_vpc_domains(self):
+        self.rejects(lambda d: d.update(topology={"leaf_pairs": 3}), "one vpc_domain per leaf pair (3)", "asn keys must be")
+
+    def test_default_topology_is_two_spines_two_pairs_two_bgws(self):
+        data = copy.deepcopy(self.data)
+        data.pop("topology", None)
+        build.load(data)
+        self.assertEqual([d[1] for d in build.DEVICES],
+                         ["NXSP-01", "NXSP-02", "NXLF-01", "NXLF-02", "NXLF-03", "NXLF-04", "NXBGW-01", "NXBGW-02"])
+        self.assertEqual(build.border_pair(), ("NXLF-03", "NXLF-04"))
+
     def test_all_errors_reported_together(self):
         def two(d):
             d["sites"][1]["asn"]["fw"] = 65217

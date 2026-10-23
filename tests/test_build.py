@@ -30,10 +30,10 @@ class DemoFabricTest(unittest.TestCase):
 
     def test_build_succeeds_and_writes_everything(self):
         self.assertEqual(self.assert_ok, 0)
-        self.assertEqual(len(self.configs), 16)
+        self.assertEqual(len(self.configs), 2 * len(build.DEVICES))
         self.assertEqual(len(list((self.out / "configs").glob("*.panos.txt"))), 2)
         self.assertTrue((self.out / "demo-fabric-design.html").is_file())
-        self.assertEqual(len(list((self.out / "checks").glob("*.txt"))), 16)
+        self.assertEqual(len(list((self.out / "checks").glob("*.txt"))), 2 * len(build.DEVICES))
         self.assertTrue((self.out / "checks" / "checks.json").is_file())
 
     def test_no_ospf_configured(self):
@@ -88,7 +88,7 @@ class DemoFabricTest(unittest.TestCase):
             a = ip.split(".")
             if a[2] in ("242", "246"):
                 links[(a[1], a[2], int(a[3]) // 2)] |= devs
-        self.assertEqual(len(links), 2 * 2 * 6 + len(build.dci_links()))
+        self.assertEqual(len(links), 2 * len(build.spines()) * len(build.DOWNSTREAM) + len(build.dci_links()))
         for key, devs in links.items():
             self.assertEqual(len(devs), 2, key)
 
