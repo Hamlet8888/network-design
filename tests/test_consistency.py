@@ -19,14 +19,29 @@ ROOT = Path(__file__).resolve().parent.parent
 DEMO = ROOT / "examples" / "demo-fabric.json"
 
 
+def big_topology(data):
+    """The demo grown to 4 spines, 3 leaf pairs and 4 BGWs per site, with ASNs and vPC domains to match."""
+    data["topology"] = {"spines": 4, "leaf_pairs": 3, "bgws": 4}
+    for n, s in enumerate(data["sites"]):
+        base = 65300 + 100 * n
+        s["vpc_domains"] = [s["vpc_domains"][0] + i for i in range(3)]
+        asn = {"spine": base, "fw": base + 90, "core": base + 91}
+        asn.update({f"NXLF-{i + 1:02d}": base + 1 + i for i in range(6)})
+        asn.update({f"NXBGW-{j + 1:02d}": base + 20 + j for j in range(4)})
+        s["asn"] = asn
+
+
 class FabricConsistencyTest(unittest.TestCase):
     """Runs against the demo data as committed (full-mesh DCI)."""
 
     dci_mode = None     # None: as in the demo file; subclasses override
+    mutate = None       # optional function(data) applied before the build
 
     @classmethod
     def setUpClass(cls):
         cls.data = json.loads(DEMO.read_text())
+        if cls.mutate:
+            cls.mutate(cls.data)
         if cls.dci_mode:
             cls.data["dci"] = {"mode": cls.dci_mode}
         cls.tmp = tempfile.TemporaryDirectory()
@@ -83,7 +98,7 @@ class FabricConsistencyTest(unittest.TestCase):
 
     def vpc_pairs(self):
         for site in self.sites:
-            for a, b in (("NXLF-01", "NXLF-02"), ("NXLF-03", "NXLF-04")):
+            for a, b in build.leaf_pairs():
                 yield site, self.dev(site, a), self.dev(site, b)
 
     # -- addressing -----------------------------------------------------------
@@ -176,11 +191,12 @@ class FabricConsistencyTest(unittest.TestCase):
                 self.assertNotEqual(mine.ip, theirs.ip)
                 self.assertEqual(node.values("mtu"), far_if.values("mtu"), f"{c.name} {ifname}")
                 checked += 1
-        self.assertEqual(checked, 2 * 2 * 2 * 6)  # 2 sites x 2 spines x 6 downstream, both ends
+        # 2 sites x spines x downstream devices, both ends
+        self.assertEqual(checked, 2 * len(build.spines()) * len(build.DOWNSTREAM) * 2)
 
     def test_dci_links_join_bgws_of_different_sites(self):
         links = self.dci_links()
-        expect = {"pair": 2, "full-mesh": 4}[build.DCI_MODE]
+        expect = {"pair": 1, "full-mesh": 2}[build.DCI_MODE] * len(build.bgws())
         self.assertEqual(len(links), expect)
         owners = {f"10.{s['octet']}.246.0/24": code for code, s in self.sites.items()}
         for carrier, (na, ia, aa), (nb, ib, ab) in links:
@@ -207,7 +223,7 @@ class FabricConsistencyTest(unittest.TestCase):
             per_bgw[na].append((carrier, nb, ia))
             per_bgw[nb].append((carrier, na, ib))
             pairs.add(frozenset((na, nb)))
-        self.assertEqual(len(pairs), 4, "every BGW pair across the sites is joined once")
+        self.assertEqual(len(pairs), 2 * len(build.bgws()), "no two circuits join the same two BGWs")
         for bgw, links in per_bgw.items():
             self.assertEqual(sorted(c for c, _, _ in links), ["A", "B"], bgw)
             self.assertEqual(len({far for _, far, _ in links}), 2, f"{bgw}: both circuits go to the same BGW")
@@ -370,7 +386,7 @@ class FabricConsistencyTest(unittest.TestCase):
             for c in bgws:
                 nve, _, _ = c.nve()
                 self.assertIn("multisite border-gateway interface loopback100", [x.line for x in nve.children])
-                for spine_if in ("Ethernet1/49", "Ethernet1/50"):
+                for spine_if in (build.uplink(i) for i in range(len(build.spines()))):
                     self.assertIn("evpn multisite fabric-tracking",
                                   [x.line for x in c.interfaces[spine_if].children], c.name)
         self.assertEqual(len(set(ids.values())), len(ids), "Multi-Site site IDs must differ per site")
@@ -414,6 +430,9 @@ class FabricConsistencyTest(unittest.TestCase):
 
     def test_cloud_providers_land_on_separate_routed_ports(self):
         for c in self.role_devs("NXBGW"):
+            if not build.has_cloud(c.name.split("-", 1)[1]):
+                self.assertEqual([i for i in c.interfaces if "." in i], [], c.name)
+                continue
             parents = {}
             for ifname, node in c.interfaces.items():
                 desc = (node.values("description") or [""])[0]
@@ -627,6 +646,19 @@ class FabricConsistencyTest(unittest.TestCase):
 class PairDciConsistencyTest(FabricConsistencyTest):
     """The same checks with the original one-circuit-per-BGW DCI."""
 
+    dci_mode = "pair"
+
+
+class BigTopologyConsistencyTest(FabricConsistencyTest):
+    """The same checks on 4 spines, 3 leaf pairs and 4 BGWs per site (full-mesh DCI)."""
+
+    mutate = staticmethod(big_topology)
+
+
+class BigTopologyPairDciConsistencyTest(FabricConsistencyTest):
+    """4 spines, 3 leaf pairs and 4 BGWs per site with the pair DCI."""
+
+    mutate = staticmethod(big_topology)
     dci_mode = "pair"
 
 

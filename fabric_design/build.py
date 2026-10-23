@@ -30,11 +30,14 @@ CLOUD_AZURE = []
 AWS_ASN = 64512
 AZURE_ASN = 12076
 DCI_MODE = "pair"   # "pair": one DCI link per BGW; "full-mesh": every BGW to both remote BGWs
+TOPO = {}           # spines, leaf_pairs (the last pair is the border-service pair), bgws
+DEFAULT_TOPO = dict(spines=2, leaf_pairs=2, bgws=2)
 
 
 def load(data):
     """Install a site data document (see examples/demo-fabric.json) as the design input."""
     global DATA, SITES, SITE_ORDER, ASN_PLAN, TRUST_VLANS, DMZ_VLANS, CLOUD_AWS, CLOUD_AZURE, AWS_ASN, AZURE_ASN, DCI_MODE
+    global TOPO, DEVICES, DOWNSTREAM
     validate(data)
     sites = data["sites"]
     DATA = data
@@ -55,6 +58,9 @@ def load(data):
     CLOUD_AWS, CLOUD_AZURE = c["aws_prefixes"], c["azure_prefixes"]
     AWS_ASN, AZURE_ASN = c["aws_asn"], c["azure_asn"]
     DCI_MODE = data.get("dci", {}).get("mode", "pair")
+    TOPO = topology(data)
+    DEVICES = build_devices(TOPO)
+    DOWNSTREAM = [d[1] for d in DEVICES if not d[1].startswith("NXSP")]
 
 
 def validate(data):
@@ -88,6 +94,17 @@ def validate(data):
     if missing:
         errors.append(f"doc migration table needs steps {missing} (the configs and checks refer to them)")
 
+    topo = topology(data)
+    limits = dict(spines=(2, 4), leaf_pairs=(2, 5), bgws=(2, 4))
+    topo_errors = [f"topology {key} must be {lo}-{hi}" for key, (lo, hi) in limits.items()
+                   if not isinstance(topo[key], int) or not lo <= topo[key] <= hi]
+    if not topo_errors and topo["bgws"] % 2:
+        topo_errors.append("topology bgws must be even (BGWs pair up for the DCI and cloud circuits)")
+    if topo_errors:
+        # every later check depends on the device list, so stop here
+        raise ValueError("invalid site data:\n  " + "\n  ".join(errors + topo_errors))
+    devices = build_devices(topo)
+
     mode = data.get("dci", {}).get("mode", "pair")
     if mode not in ("pair", "full-mesh"):
         errors.append(f"dci mode {mode!r} must be 'pair' or 'full-mesh'")
@@ -100,10 +117,9 @@ def validate(data):
         site = x["code"]
         if not 0 <= x["octet"] <= 255:
             errors.append(f"{site}: octet {x['octet']} is not 0-255")
-        if len(x["vpc_domains"]) != 2:
-            errors.append(f"{site}: needs exactly two vpc_domains")
-        expected = {d[1] for d in DEVICES} | {"spine", "fw", "core"}
-        expected -= {d[1] for d in DEVICES if d[1].startswith("NXSP")}
+        if len(x["vpc_domains"]) != topo["leaf_pairs"]:
+            errors.append(f"{site}: needs one vpc_domain per leaf pair ({topo['leaf_pairs']})")
+        expected = {d[1] for d in devices if not d[1].startswith("NXSP")} | {"spine", "fw", "core"}
         if set(x["asn"]) != expected:
             errors.append(f"{site}: asn keys must be {sorted(expected)}")
         vids = [v for v, _ in x["host_vlans"]]
@@ -186,23 +202,102 @@ def legacy_vlan():
     return DATA["legacy"]["vlan"]
 
 
-# role, suffix, lo0, lo1, vpc vip, mgmt0, vpc pair index
-DEVICES = [
-    ("Spine / EVPN route server", "NXSP-01", 1, None, None, 11, None),
-    ("Spine / EVPN route server", "NXSP-02", 2, None, None, 12, None),
-    ("Leaf / VTEP", "NXLF-01", 11, 11, 101, 21, 0),
-    ("Leaf / VTEP", "NXLF-02", 12, 12, 101, 22, 0),
-    ("Border-service leaf / VTEP", "NXLF-03", 13, 13, 102, 23, 1),
-    ("Border-service leaf / VTEP", "NXLF-04", 14, 14, 102, 24, 1),
-    ("Multi-Site anycast BGW", "NXBGW-01", 21, 21, None, 31, None),
-    ("Multi-Site anycast BGW", "NXBGW-02", 22, 22, None, 32, None),
-]
-DOWNSTREAM = ["NXLF-01", "NXLF-02", "NXLF-03", "NXLF-04", "NXBGW-01", "NXBGW-02"]
+def topology(data):
+    return {**DEFAULT_TOPO, **data.get("topology", {})}
+
+
+def build_devices(topo):
+    """(role, suffix, lo0, lo1, vpc vip, mgmt0, vpc pair index) for every switch of one site.
+
+    Spines take lo0 .1-.4 and mgmt0 .11-.14; leafs lo0/lo1 .11-.20, vPC VIPs .101-.105, mgmt0 .21-.30;
+    BGWs lo0/lo1 .21-.24, mgmt0 .31-.34. The last leaf pair is the border-service pair (firewalls).
+    """
+    devs = [("Spine / EVPN route server", f"NXSP-{i + 1:02d}", i + 1, None, None, 11 + i, None)
+            for i in range(topo["spines"])]
+    for i in range(2 * topo["leaf_pairs"]):
+        pair = i // 2
+        role = "Border-service leaf / VTEP" if pair == topo["leaf_pairs"] - 1 else "Leaf / VTEP"
+        devs.append((role, f"NXLF-{i + 1:02d}", 11 + i, 11 + i, 101 + pair, 21 + i, pair))
+    devs += [("Multi-Site anycast BGW", f"NXBGW-{j + 1:02d}", 21 + j, 21 + j, None, 31 + j, None)
+             for j in range(topo["bgws"])]
+    return devs
+
+
+TOPO = dict(DEFAULT_TOPO)
+DEVICES = build_devices(TOPO)
+DOWNSTREAM = [d[1] for d in DEVICES if not d[1].startswith("NXSP")]
 BGW_VIP = 200
-# BGW port plan (Nexus 9300 with 48 x SFP28 + 6 x QSFP28, e.g. N9K-C93180YC-FX3): Eth1/49-50 to the
-# spines, Eth1/51-52 DCI, Eth1/53-54 spare for DCI growth; cloud circuits on their own SFP28 ports,
-# one per provider, since DX and ER arrive as separate cross-connects.
+# BGW port plan (Nexus 9300 with 48 x SFP28 + 6 x QSFP28, e.g. N9K-C93180YC-FX3): spines from Eth1/49,
+# then the DCI (Eth1/51-52 with two spines), the rest spare; cloud circuits on BGW-01/02 only, on their
+# own SFP28 ports, one per provider, since DX and ER arrive as separate cross-connects.
 AWS_PORT, AZURE_PORT = "Ethernet1/1", "Ethernet1/2"
+
+
+def spines():
+    return [d[1] for d in DEVICES if d[1].startswith("NXSP")]
+
+
+def leafs():
+    return [d[1] for d in DEVICES if d[1].startswith("NXLF")]
+
+
+def bgws():
+    return [d[1] for d in DEVICES if d[1].startswith("NXBGW")]
+
+
+def leaf_pairs():
+    ls = leafs()
+    return [(ls[i], ls[i + 1]) for i in range(0, len(ls), 2)]
+
+
+def border_pair():
+    return leaf_pairs()[-1]
+
+
+def uplink(si):
+    """Leaf/BGW port toward spine si (0-based)."""
+    return f"Ethernet1/{49 + si}"
+
+
+def dci_port(carrier):
+    return f"Ethernet1/{49 + TOPO['spines'] + (0 if carrier == 'A' or DCI_MODE != 'full-mesh' else 1)}"
+
+
+def has_cloud(bgw):
+    return bgw in bgws()[:2]
+
+
+def short(suf):
+    """'NXLF-03' -> 'LF-03'"""
+    return suf[2:]
+
+
+def uplink_cfg(site, di, tracking=False):
+    """Routed uplinks from downstream device di to every spine."""
+    blocks = []
+    for si, spine in enumerate(spines()):
+        _, a = p2p(site, si, di)
+        lines = [f"interface {uplink(si)}", f"  description {host(site, spine)} Eth1/{di + 1}", "  no switchport",
+                 "  mtu 9216", "  no ip redirects", f"  ip address {a}/31"]
+        lines += ["  evpn multisite fabric-tracking"] if tracking else []
+        blocks.append("\n".join(lines + ["  no shutdown"]))
+    return ("\n" if tracking else "\n\n").join(blocks)
+
+
+def spine_bgp_cfg(site, di, ul_out=None):
+    """(underlay neighbors, EVPN neighbors) toward every spine, as router bgp lines."""
+    o = SITES[site]["o"]
+    spine_asn = ASN_PLAN[site]["spine"]
+    ul, ev = [], []
+    for si, spine in enumerate(spines()):
+        s_ip, _ = p2p(site, si, di)
+        ul += [f"  neighbor {s_ip}", f"    remote-as {spine_asn}", f"    description {host(site, spine)} underlay",
+               "    bfd", "    address-family ipv4 unicast"]
+        ul += [f"      route-map {ul_out} out"] if ul_out else []
+        ev += [f"  neighbor 10.{o}.240.{si + 1}", f"    remote-as {spine_asn}", f"    description {host(site, spine)} EVPN",
+               "    update-source loopback0", "    ebgp-multihop 2", "    address-family l2vpn evpn",
+               "      send-community", "      send-community extended"]
+    return "\n".join(ul), "\n".join(ev)
 ANYCAST_MAC = "2020.0000.00aa"
 
 TRUST = dict(name="TRUST", id=10, l3vni=50010, vlan=3910, rt="65000:50010")
@@ -217,7 +312,7 @@ def cloud_links(site, bgw):
     Azure uses the first usable address of each /30 for the customer and the second for Microsoft.
     """
     o = SITES[site]["o"]
-    k = 0 if bgw == "NXBGW-01" else 1
+    k = bgws().index(bgw)
     aws = 0 + k * 8
     az = 16 + k * 4
     return (f"10.{o}.244.{aws}/30", f"10.{o}.244.{aws + 1}", f"10.{o}.244.{aws + 2}",
@@ -229,22 +324,22 @@ def dci_links():
     """Every DCI /31: dict(carrier, port, net, ends) with ends = [(site, BGW suffix, IP), ...].
 
     Carrier A circuits are addressed from site A's 10.x.246.0/24, carrier B from site B's; the
-    owning site takes the even address. "pair" gives each BGW one circuit: carrier A joins the
-    BGW-01s, carrier B the BGW-02s (Eth1/51). "full-mesh" gives each BGW one circuit per carrier
-    to a different remote BGW: carrier A joins 01-01 and 02-02 (Eth1/51), carrier B crosses over,
-    B-01 to A-02 and B-02 to A-01 (Eth1/52). A carrier or a BGW can then fail and every surviving
-    BGW keeps a DCI path, so no BGW is isolated by a single failure.
+    owning site takes the even address. "pair" gives each BGW one circuit to its namesake: carrier A
+    for BGW-01 (and -03), carrier B for BGW-02 (and -04). "full-mesh" gives each BGW one circuit per
+    carrier to a different remote BGW: carrier A joins namesakes (01-01, 02-02), carrier B crosses
+    over within each BGW pair (01-02, 02-01). A carrier or a BGW can then fail and every surviving
+    BGW keeps a DCI path, so no BGW is isolated by a single failure. Ports follow the spine uplinks
+    (Eth1/51, and Eth1/52 for carrier B in full mesh, with two spines).
     """
     a, b = A(), B()
     oa, ob = SITES[a]["o"], SITES[b]["o"]
+    g = bgws()
     if DCI_MODE == "full-mesh":
-        spec = [("A", "Ethernet1/51", oa, a, "NXBGW-01", b, "NXBGW-01"),
-                ("A", "Ethernet1/51", oa, a, "NXBGW-02", b, "NXBGW-02"),
-                ("B", "Ethernet1/52", ob, b, "NXBGW-02", a, "NXBGW-01"),
-                ("B", "Ethernet1/52", ob, b, "NXBGW-01", a, "NXBGW-02")]
+        spec = [("A", oa, a, g[i], b, g[i]) for i in range(len(g))]
+        spec += [("B", ob, b, g[i ^ 1], a, g[i]) for i in range(len(g))]
     else:
-        spec = [("A", "Ethernet1/51", oa, a, "NXBGW-01", b, "NXBGW-01"),
-                ("B", "Ethernet1/51", ob, b, "NXBGW-02", a, "NXBGW-02")]
+        spec = [("A", oa, a, g[i], b, g[i]) if i % 2 == 0 else ("B", ob, b, g[i], a, g[i]) for i in range(len(g))]
+    spec = [(c, dci_port(c), *rest) for c, *rest in spec]
     links, used = [], {}
     for carrier, port, o, own_site, own_bgw, far_site, far_bgw in spec:
         k = used.get(o, 0)
@@ -340,7 +435,7 @@ def device_rows(site):
 
 def p2p_rows(site):
     rows = []
-    for si, spine in enumerate(["NXSP-01", "NXSP-02"]):
+    for si, spine in enumerate(spines()):
         for di, down in enumerate(DOWNSTREAM):
             a, b = p2p(site, si, di)
             rows.append([esc(host(site, spine)), f"Eth1/{di + 1}", mono(f"{a}/31"),
@@ -350,15 +445,20 @@ def p2p_rows(site):
 
 def blocks_rows():
     rows = []
+    vtep_max = max(d[3] for d in DEVICES if d[3])
+    spine_p2p = ", ".join(f"spine-{i + 1:02d} from .{i * 32}" for i in range(len(spines())))
+    pairs = ", ".join(f"pair {'ABCDE'[i]} .{i * 8}–.{i * 8 + 7}" for i in range(len(leaf_pairs())))
+    b1, b2 = (short(x) for x in border_pair())
+    words = {2: "two", 4: "four"}
     spec = [
         ("240.0/24", "Loopback0: router-ID and EVPN peering", "One /32 per device"),
-        ("241.0/24", "Loopback1: VTEP (NVE source), vPC anycast VTEP, Multi-Site VIP (loopback100)", "Leafs/BGWs .11–.22, vPC VIPs .101–.102, BGW VIP .200"),
-        ("242.0/24", "Underlay point-to-point /31s (spine to leaf/BGW)", "Spine-01 from .0, spine-02 from .32; spine side even"),
-        ("243.0/24", "vPC peer-keepalive and backup underlay VLAN 3900 (/30s)", "Pair A .0–.7, pair B .8–.15"),
-        ("244.0/24", "Day-one cloud peering in VRF TRUST: AWS Direct Connect and Azure ExpressRoute (one /29 slot per peering)", ".0/29 DX conn 1 (BGW-01), .8/29 DX conn 2 (BGW-02), .16/29 ER = primary .16/30 (BGW-01) + secondary .20/30 (BGW-02). .64/29 + .72/29: firewall eBGP transit (LF-03, LF-04). The rest is reserved for per-VRF firewall transit"),
-        ("245.0/24", "New OOB management for mgmt0 (gateway on the firewall, not on the fabric)", "Gateway .1, devices .11–.32"),
+        ("241.0/24", "Loopback1: VTEP (NVE source), vPC anycast VTEP, Multi-Site VIP (loopback100)", f"Leafs/BGWs .11–.{vtep_max}, vPC VIPs .101–.{100 + len(leaf_pairs())}, BGW VIP .{BGW_VIP}"),
+        ("242.0/24", "Underlay point-to-point /31s (spine to leaf/BGW)", spine_p2p[0].upper() + spine_p2p[1:] + "; spine side even"),
+        ("243.0/24", "vPC peer-keepalive and backup underlay VLAN 3900 (/30s)", pairs[0].upper() + pairs[1:]),
+        ("244.0/24", "Day-one cloud peering in VRF TRUST: AWS Direct Connect and Azure ExpressRoute (one /29 slot per peering)", f".0/29 DX conn 1 (BGW-01), .8/29 DX conn 2 (BGW-02), .16/29 ER = primary .16/30 (BGW-01) + secondary .20/30 (BGW-02). .64/29 + .72/29: firewall eBGP transit ({b1}, {b2}). The rest is reserved for per-VRF firewall transit"),
+        ("245.0/24", "New OOB management for mgmt0 (gateway on the firewall, not on the fabric)", f"Gateway .1, devices .11–.{max(d[5] for d in DEVICES)}"),
         ("246.0/24", "DCI point-to-point /31s (each site owns one carrier)",
-         f"{A()}: carrier A, {B()}: carrier B" + (", two circuits each (full mesh)" if DCI_MODE == "full-mesh" else "")),
+         f"{A()}: carrier A, {B()}: carrier B" + (f", {words[len(bgws())]} circuits each (full mesh)" if DCI_MODE == "full-mesh" else "")),
         ("247.0/24", "Reserved for growth (more leafs, a second pod)", ""),
     ]
     for suffix, use, detail in spec:
@@ -369,7 +469,7 @@ def blocks_rows():
 def fw_rows():
     rows = []
     for site in SITE_ORDER:
-        for leaf in ("NXLF-03", "NXLF-04"):
+        for leaf in border_pair():
             vlan, net, fw_ip, leaf_ip, fw_port = fw_transit(site, leaf)
             rows.append([f"{site} firewall", f"{SITES[site]['fw_pair']} {fw_port} " + mono(f"{fw_ip}/29") + f" (AS {ASN_PLAN[site]['fw']})",
                          f"{esc(host(site, leaf))} VLAN {vlan} SVI " + mono(f"{leaf_ip}/29") + f" (AS {dev_asn(site, leaf)})",
@@ -378,9 +478,10 @@ def fw_rows():
 
 
 def asn_rows():
-    labels = [("spine", "Spines (both)"), ("NXLF-01", "LF-01"), ("NXLF-02", "LF-02"), ("NXLF-03", "LF-03 (border-service)"),
-              ("NXLF-04", "LF-04 (border-service)"), ("NXBGW-01", "BGW-01"), ("NXBGW-02", "BGW-02"),
-              ("fw", "Palo Alto HA pair"), ("core", "Legacy core (migration only)")]
+    labels = [("spine", "Spines (both)" if len(spines()) == 2 else "Spines (all)")]
+    labels += [(x, short(x) + (" (border-service)" if x in border_pair() else "")) for x in leafs()]
+    labels += [(x, short(x)) for x in bgws()]
+    labels += [("fw", "Palo Alto HA pair"), ("core", "Legacy core (migration only)")]
     rows = [[esc(l), str(ASN_PLAN[A()][k]), str(ASN_PLAN[B()][k])] for k, l in labels]
     rows.append(["AWS DX gateway / Azure ER", f"{AWS_ASN} / {AZURE_ASN}", f"{AWS_ASN} / {AZURE_ASN}"])
     return rows
@@ -389,7 +490,7 @@ def asn_rows():
 def cloud_rows():
     rows = []
     for site in SITE_ORDER:
-        for bgw in ("NXBGW-01", "NXBGW-02"):
+        for bgw in bgws()[:2]:
             aws_net, aws_me, aws_peer, az_net, az_me, az_peer, (dx, er) = cloud_links(site, bgw)
             rows.append([f"{site} AWS DX {dx}", f"{esc(host(site, bgw))} {short_port(AWS_PORT)}.&lt;VIF VLAN&gt; " + mono(f"{aws_me}/30"),
                          f"AWS (AS {AWS_ASN}) " + mono(aws_peer), "Private VIF, VRF TRUST, BFD, MD5"])
@@ -402,7 +503,7 @@ def vpc_rows(site):
     S = SITES[site]
     o = S["o"]
     rows = []
-    for i, (a, b) in enumerate([("NXLF-01", "NXLF-02"), ("NXLF-03", "NXLF-04")]):
+    for i, (a, b) in enumerate(leaf_pairs()):
         k = i * 8
         rows.append([str(S["vpc"][i]), f"{esc(host(site, a))} + {esc(host(site, b))}",
                      f"{mono(f'10.{o}.243.{k + 1}/30')} / {mono(f'10.{o}.243.{k + 2}/30')} (Eth1/48, VRF KEEPALIVE)",
@@ -504,8 +605,7 @@ def _leaf_common(site, idx):
     bk_me, bk_peer = (k + 5, k + 6) if first else (k + 6, k + 5)
     lo0, lo1, vip = f"10.{o}.240.{me[2]}", f"10.{o}.241.{me[3]}", f"10.{o}.241.{me[4]}"
     di = DOWNSTREAM.index(me[1])
-    s1, a1 = p2p(site, 0, di)
-    s2, a2 = p2p(site, 1, di)
+    spine_ul, spine_ev = spine_bgp_cfg(site, di)
     return f"""
 hostname {host(site, me[1])}
 
@@ -529,21 +629,7 @@ interface loopback1
   ip address {lo1}/32
   ip address {vip}/32 secondary
 
-interface Ethernet1/49
-  description {host(site, 'NXSP-01')} Eth1/{di + 1}
-  no switchport
-  mtu 9216
-  no ip redirects
-  ip address {a1}/31
-  no shutdown
-
-interface Ethernet1/50
-  description {host(site, 'NXSP-02')} Eth1/{di + 1}
-  no switchport
-  mtu 9216
-  no ip redirects
-  ip address {a2}/31
-  no shutdown
+{uplink_cfg(site, di)}
 
 ! ---- vPC ---------------------------------------------------------------
 vrf context KEEPALIVE
@@ -624,37 +710,13 @@ router bgp {asn}
     maximum-paths 4
   address-family l2vpn evpn
     advertise-pip
-  neighbor {s1}
-    remote-as {spine_asn}
-    description {host(site, 'NXSP-01')} underlay
-    bfd
-    address-family ipv4 unicast
-  neighbor {s2}
-    remote-as {spine_asn}
-    description {host(site, 'NXSP-02')} underlay
-    bfd
-    address-family ipv4 unicast
+{spine_ul}
   neighbor 10.{o}.243.{bk_peer}
     remote-as {dev_asn(site, mate[1])}
     description {host(site, mate[1])} vPC backup underlay
     bfd
     address-family ipv4 unicast
-  neighbor 10.{o}.240.1
-    remote-as {spine_asn}
-    description {host(site, 'NXSP-01')} EVPN
-    update-source loopback0
-    ebgp-multihop 2
-    address-family l2vpn evpn
-      send-community
-      send-community extended
-  neighbor 10.{o}.240.2
-    remote-as {spine_asn}
-    description {host(site, 'NXSP-02')} EVPN
-    update-source loopback0
-    ebgp-multihop 2
-    address-family l2vpn evpn
-      send-community
-      send-community extended
+{spine_ev}
   vrf {TRUST['name']}
     address-family ipv4 unicast
       redistribute direct route-map RM-DIRECT
@@ -669,7 +731,7 @@ def cfg_leaf(site, idx):
 def fw_transit(site, leaf):
     """(vlan, net, firewall IP, leaf IP, firewall port) for one border leaf's firewall transit."""
     o = SITES[site]["o"]
-    k = 0 if leaf == "NXLF-03" else 1
+    k = border_pair().index(leaf)
     base = 64 + k * 8
     return (3011 + k, f"10.{o}.244.{base}/29", f"10.{o}.244.{base + 1}", f"10.{o}.244.{base + 2}",
             fw_ports()[k])
@@ -684,7 +746,7 @@ def cfg_border_extra(site, idx):
     oo = SITES[other]["o"]
     vlan, net, fw_ip, leaf_ip, fw_port = fw_transit(site, me[1])
     lv = legacy_vlan()
-    svi99 = f"10.{o}.{lv}.{11 if me[1] == 'NXLF-03' else 12}"
+    svi99 = f"10.{o}.{lv}.{11 + border_pair().index(me[1])}"
     core_ip = S["core99"] or f"<{site}-CORE-VLAN{lv}-IP>"
     fw1, fw2 = S["fws"]
     return f"""
@@ -792,8 +854,9 @@ router bgp {asn}
 def panos_handoff(site):
     S = SITES[site]
     o = S["o"]
-    t3 = fw_transit(site, "NXLF-03")
-    t4 = fw_transit(site, "NXLF-04")
+    b1, b2 = border_pair()
+    t3 = fw_transit(site, b1)
+    t4 = fw_transit(site, b2)
     fw_as = ASN_PLAN[site]["fw"]
     fw = DATA["firewall"]
     p1, p2 = fw_ports()
@@ -828,9 +891,9 @@ delete network interface ethernet {p2} aggregate-group
 
 # 2. Two routed transit interfaces ({fw['zone']} zone, VR {fw['vr']}).
 set network interface ethernet {p1} layer3 ip {t3[2]}/29
-set network interface ethernet {p1} comment "{host(site, 'NXLF-03')} Eth1/45-46 VLAN {t3[0]} ({t3[1]})"
+set network interface ethernet {p1} comment "{host(site, b1)} Eth1/45-46 VLAN {t3[0]} ({t3[1]})"
 set network interface ethernet {p2} layer3 ip {t4[2]}/29
-set network interface ethernet {p2} comment "{host(site, 'NXLF-04')} Eth1/45-46 VLAN {t4[0]} ({t4[1]})"
+set network interface ethernet {p2} comment "{host(site, b2)} Eth1/45-46 VLAN {t4[0]} ({t4[1]})"
 {vr} interface [ {p1} {p2} ]
 set zone {fw['zone']} network layer3 [ {p1} {p2} ]
 
@@ -842,8 +905,8 @@ set zone {fw['zone']} network layer3 [ {p1} {p2} ]
 {bgp} allow-redist-default-route yes
 {bgp} routing-options ecmp-multi-as yes
 {bgp} peer-group FABRIC enable yes type ebgp import-nexthop original export-nexthop resolve remove-private-as no
-{bgp} peer-group FABRIC peer {host(site, 'NXLF-03')} enable yes peer-as {dev_asn(site, 'NXLF-03')} local-address interface {t3[4]} ip {t3[2]}/29 peer-address ip {t3[3]} bfd profile default
-{bgp} peer-group FABRIC peer {host(site, 'NXLF-04')} enable yes peer-as {dev_asn(site, 'NXLF-04')} local-address interface {t4[4]} ip {t4[2]}/29 peer-address ip {t4[3]} bfd profile default
+{bgp} peer-group FABRIC peer {host(site, b1)} enable yes peer-as {dev_asn(site, b1)} local-address interface {t3[4]} ip {t3[2]}/29 peer-address ip {t3[3]} bfd profile default
+{bgp} peer-group FABRIC peer {host(site, b2)} enable yes peer-as {dev_asn(site, b2)} local-address interface {t4[4]} ip {t4[2]}/29 peer-address ip {t4[3]} bfd profile default
 {vr} ecmp enable yes max-path 2
 {vr} protocol ospf enable no
 
@@ -858,7 +921,7 @@ set zone {fw['zone']} network layer3 [ {p1} {p2} ]
 {bgp} policy import rules DENY-REST enable yes used-by FABRIC action deny
 {sac_static}
 # Commit, then check:
-#   show routing protocol bgp peer          -> 2 peers Established ({dev_asn(site, 'NXLF-03')}, {dev_asn(site, 'NXLF-04')})
+#   show routing protocol bgp peer          -> 2 peers Established ({dev_asn(site, b1)}, {dev_asn(site, b2)})
 #   show routing route type bgp             -> site prefixes via both next hops
 """.strip("\n") + "\n"
 
@@ -874,9 +937,19 @@ def cfg_bgw(site, idx):
     po = P["o"]
     lo0, lo1 = f"10.{o}.240.{me[2]}", f"10.{o}.241.{me[3]}"
     di = DOWNSTREAM.index(me[1])
-    s1, a1 = p2p(site, 0, di)
-    s2, a2 = p2p(site, 1, di)
+    spine_ul, spine_ev = spine_bgp_cfg(site, di, ul_out="RM-FABRIC-UL-OUT")
     dci = bgw_dci(site, me[1])
+    remote_ev = "\n".join(f"""  neighbor 10.{po}.240.{d[2]}
+    remote-as {dev_asn(peer, d[1])}
+    description {host(peer, d[1])} EVPN
+    update-source loopback0
+    ebgp-multihop 5
+    peer-type fabric-external
+    address-family l2vpn evpn
+      send-community
+      send-community extended
+      route-map RM-DCI-EVPN-IN in
+      route-map RM-DCI-EVPN-OUT out""" for d in DEVICES if d[1].startswith("NXBGW"))
     dci_if = "\n".join(f"""interface {port}
   description DCI carrier {carrier} to {host(rs, rb)}
   no switchport
@@ -898,52 +971,12 @@ def cfg_bgw(site, idx):
     pl_az = "\n".join(f"ip prefix-list PL-CLOUD-AZURE seq {10 * (i + 1)} permit {n} le 24" for i, n in enumerate(CLOUD_AZURE))
 
     def bgw_locals(oct_):
-        return [f"10.{oct_}.240.21/32", f"10.{oct_}.240.22/32", f"10.{oct_}.241.21/32", f"10.{oct_}.241.22/32",
-                f"10.{oct_}.241.{BGW_VIP}/32"]
-    pl_local = "\n".join(f"ip prefix-list PL-BGW-LOCAL seq {10 * (i + 1)} permit {n}" for i, n in enumerate(bgw_locals(o)))
-    pl_remote = "\n".join(f"ip prefix-list PL-BGW-REMOTE seq {10 * (i + 1)} permit {n}" for i, n in enumerate(bgw_locals(po)))
-    return f"""
-hostname {host(site, me[1])}
-
-nv overlay evpn
-feature bgp
-feature bfd
-feature interface-vlan
-feature vn-segment-vlan-based
-feature nv overlay
-
-evpn multisite border-gateway {S['site_id']}
-  delay-restore time 300
-
-interface loopback0
-  ip address {lo0}/32
-interface loopback1
-  description VTEP
-  ip address {lo1}/32
-interface loopback100
-  description Multi-Site VIP (shared by both {site} BGWs)
-  ip address 10.{o}.241.{BGW_VIP}/32
-
-interface Ethernet1/49
-  description {host(site, 'NXSP-01')} Eth1/{di + 1}
-  no switchport
-  mtu 9216
-  no ip redirects
-  ip address {a1}/31
-  evpn multisite fabric-tracking
-  no shutdown
-interface Ethernet1/50
-  description {host(site, 'NXSP-02')} Eth1/{di + 1}
-  no switchport
-  mtu 9216
-  no ip redirects
-  ip address {a2}/31
-  evpn multisite fabric-tracking
-  no shutdown
-
-{dci_if}
-
-! ---- day-one cloud handoff (VRF TRUST) --------------------------------
+        g = [d for d in DEVICES if d[1].startswith("NXBGW")]
+        return ([f"10.{oct_}.240.{d[2]}/32" for d in g] + [f"10.{oct_}.241.{d[3]}/32" for d in g]
+                + [f"10.{oct_}.241.{BGW_VIP}/32"])
+    cloud_if = cloud_nbr = ""
+    if has_cloud(me[1]):
+        cloud_if = f"""! ---- day-one cloud handoff (VRF TRUST) --------------------------------
 ! Routed subinterfaces only: an anycast BGW takes no endpoints, access ports or BGW-local VLANs.
 interface {AWS_PORT}
   description AWS Direct Connect {dx_conn} (10G cross-connect)
@@ -975,7 +1008,54 @@ interface {AZURE_PORT}.<ER-VLAN>
   ip address {az_me}/30
   no shutdown
 
-vrf context {TRUST['name']}
+"""
+        cloud_nbr = f"""    neighbor {aws_peer}
+      remote-as {AWS_ASN}
+      description AWS Direct Connect private VIF ({dx_conn})
+      password <AWS-BGP-MD5-KEY>          ! from the vault, same key as on the VIF
+      bfd
+      address-family ipv4 unicast
+        route-map RM-AWS-IN in
+        route-map RM-TO-CLOUD out
+        maximum-prefix 100 warning-only
+    neighbor {az_peer}
+      remote-as {AZURE_ASN}
+      description Azure ExpressRoute private peering ({er_link} link)
+      bfd
+      address-family ipv4 unicast
+        route-map RM-AZURE-IN in
+        route-map RM-TO-CLOUD out
+        maximum-prefix 100 warning-only
+"""
+    pl_local = "\n".join(f"ip prefix-list PL-BGW-LOCAL seq {10 * (i + 1)} permit {n}" for i, n in enumerate(bgw_locals(o)))
+    pl_remote = "\n".join(f"ip prefix-list PL-BGW-REMOTE seq {10 * (i + 1)} permit {n}" for i, n in enumerate(bgw_locals(po)))
+    return f"""
+hostname {host(site, me[1])}
+
+nv overlay evpn
+feature bgp
+feature bfd
+feature interface-vlan
+feature vn-segment-vlan-based
+feature nv overlay
+
+evpn multisite border-gateway {S['site_id']}
+  delay-restore time 300
+
+interface loopback0
+  ip address {lo0}/32
+interface loopback1
+  description VTEP
+  ip address {lo1}/32
+interface loopback100
+  description Multi-Site VIP (shared by {"both" if len(bgws()) == 2 else "all"} {site} BGWs)
+  ip address 10.{o}.241.{BGW_VIP}/32
+
+{uplink_cfg(site, di, tracking=True)}
+
+{dci_if}
+
+{cloud_if}vrf context {TRUST['name']}
   vni {TRUST['l3vni']}
   rd auto
   address-family ipv4 unicast
@@ -1044,58 +1124,11 @@ router bgp {asn}
     maximum-paths 4
   address-family l2vpn evpn
   ! local fabric: eBGP underlay on the links, eBGP EVPN to the spine loopbacks
-  neighbor {s1}
-    remote-as {spine_asn}
-    description {host(site, 'NXSP-01')} underlay
-    bfd
-    address-family ipv4 unicast
-      route-map RM-FABRIC-UL-OUT out
-  neighbor {s2}
-    remote-as {spine_asn}
-    description {host(site, 'NXSP-02')} underlay
-    bfd
-    address-family ipv4 unicast
-      route-map RM-FABRIC-UL-OUT out
-  neighbor 10.{o}.240.1
-    remote-as {spine_asn}
-    description {host(site, 'NXSP-01')} EVPN
-    update-source loopback0
-    ebgp-multihop 2
-    address-family l2vpn evpn
-      send-community
-      send-community extended
-  neighbor 10.{o}.240.2
-    remote-as {spine_asn}
-    description {host(site, 'NXSP-02')} EVPN
-    update-source loopback0
-    ebgp-multihop 2
-    address-family l2vpn evpn
-      send-community
-      send-community extended
+{spine_ul}
+{spine_ev}
 {dci_nbr}
-  ! DCI overlay to both remote BGWs
-  neighbor 10.{po}.240.21
-    remote-as {dev_asn(peer, 'NXBGW-01')}
-    description {host(peer, 'NXBGW-01')} EVPN
-    update-source loopback0
-    ebgp-multihop 5
-    peer-type fabric-external
-    address-family l2vpn evpn
-      send-community
-      send-community extended
-      route-map RM-DCI-EVPN-IN in
-      route-map RM-DCI-EVPN-OUT out
-  neighbor 10.{po}.240.22
-    remote-as {dev_asn(peer, 'NXBGW-02')}
-    description {host(peer, 'NXBGW-02')} EVPN
-    update-source loopback0
-    ebgp-multihop 5
-    peer-type fabric-external
-    address-family l2vpn evpn
-      send-community
-      send-community extended
-      route-map RM-DCI-EVPN-IN in
-      route-map RM-DCI-EVPN-OUT out
+  ! DCI overlay to {"both" if len(bgws()) == 2 else "all"} remote BGWs
+{remote_ev}
   ! cloud peerings: learned prefixes become type-5 routes in the local fabric and, through
   ! RM-DCI-EVPN-OUT, at the other site (which prefers its own cloud links: shorter AS path)
   vrf {TRUST['name']}
@@ -1103,24 +1136,7 @@ router bgp {asn}
       aggregate-address 10.{o}.0.0/16
       aggregate-address 10.{po}.0.0/16
       maximum-paths 4
-    neighbor {aws_peer}
-      remote-as {AWS_ASN}
-      description AWS Direct Connect private VIF ({dx_conn})
-      password <AWS-BGP-MD5-KEY>          ! from the vault, same key as on the VIF
-      bfd
-      address-family ipv4 unicast
-        route-map RM-AWS-IN in
-        route-map RM-TO-CLOUD out
-        maximum-prefix 100 warning-only
-    neighbor {az_peer}
-      remote-as {AZURE_ASN}
-      description Azure ExpressRoute private peering ({er_link} link)
-      bfd
-      address-family ipv4 unicast
-        route-map RM-AZURE-IN in
-        route-map RM-TO-CLOUD out
-        maximum-prefix 100 warning-only
-""".strip("\n")
+{cloud_nbr}""".strip("\n")
 
 
 def mgmt_cfg(site, idx):
@@ -1213,7 +1229,7 @@ def full_config(site, idx):
         body = cfg_bgw(site, idx)
     else:
         body = _leaf_common(site, idx)
-        if suf in ("NXLF-03", "NXLF-04"):
+        if suf in border_pair():
             body += "\n\n" + cfg_border_extra(site, idx)
     lines = body.split("\n")
     base = baseline_cfg(site, idx)
@@ -1240,7 +1256,7 @@ def bgp_sessions(site, idx):
             out.append((STEP["build"], "default", "evpn", f"10.{o}.240.{l0}", dev_asn(site, down), host(site, down)))
         return out
     di = DOWNSTREAM.index(suf)
-    for si, spine in enumerate(("NXSP-01", "NXSP-02")):
+    for si, spine in enumerate(spines()):
         a, _ = p2p(site, si, di)
         out.append((STEP["build"], "default", "ipv4", a, spine_asn, host(site, spine)))
         out.append((STEP["build"], "default", "evpn", f"10.{o}.240.{si + 1}", spine_asn, host(site, spine)))
@@ -1250,7 +1266,7 @@ def bgp_sessions(site, idx):
         k = pair * 8
         bk_peer = k + 6 if idx % 2 == 0 else k + 5
         out.append((STEP["build"], "default", "ipv4", f"10.{o}.243.{bk_peer}", dev_asn(site, mate[1]), host(site, mate[1])))
-        if suf in ("NXLF-03", "NXLF-04"):
+        if suf in border_pair():
             core_ip = S["core99"] or f"<{site}-CORE-VLAN{legacy_vlan()}-IP>"
             out.append((STEP["legacy"], TRUST["name"], "ipv4", core_ip, ASN_PLAN[site]["core"], "legacy core"))
             _, _, fw_ip, _, _ = fw_transit(site, suf)
@@ -1260,11 +1276,13 @@ def bgp_sessions(site, idx):
     po = SITES[peer]["o"]
     for _, _, _, rs, rb, rip in bgw_dci(site, suf):
         out.append((STEP["multisite"], "default", "ipv4", rip, dev_asn(rs, rb), host(rs, rb)))
-    for rb, l0 in (("NXBGW-01", 21), ("NXBGW-02", 22)):
-        out.append((STEP["multisite"], "default", "evpn", f"10.{po}.240.{l0}", dev_asn(peer, rb), host(peer, rb)))
-    _, _, aws_peer, _, _, az_peer, _ = cloud_links(site, suf)
-    out.append((STEP["multisite"], TRUST["name"], "ipv4", aws_peer, AWS_ASN, "AWS Direct Connect"))
-    out.append((STEP["multisite"], TRUST["name"], "ipv4", az_peer, AZURE_ASN, "Azure ExpressRoute"))
+    for d in DEVICES:
+        if d[1].startswith("NXBGW"):
+            out.append((STEP["multisite"], "default", "evpn", f"10.{po}.240.{d[2]}", dev_asn(peer, d[1]), host(peer, d[1])))
+    if has_cloud(suf):
+        _, _, aws_peer, _, _, az_peer, _ = cloud_links(site, suf)
+        out.append((STEP["multisite"], TRUST["name"], "ipv4", aws_peer, AWS_ASN, "AWS Direct Connect"))
+        out.append((STEP["multisite"], TRUST["name"], "ipv4", az_peer, AZURE_ASN, "Azure ExpressRoute"))
     return out
 
 
@@ -1306,14 +1324,14 @@ def device_checks(site, idx):
                        f"Source loopback1 primary 10.{o}.241.{DEVICES[idx][3]}, secondary 10.{o}.241.{DEVICES[idx][4]}; "
                        "advertise-pip and advertise virtual-rmac enabled"))
     if suf.startswith("NXBGW"):
-        checks.append((b, "show nve multisite fabric-links", "Up: Ethernet1/49, Ethernet1/50"))
+        checks.append((b, "show nve multisite fabric-links", "Up: " + ", ".join(uplink(i) for i in range(len(spines())))))
         checks.append((b, "show nve vni", f"Up: L3VNI {TRUST['l3vni']} (VRF {TRUST['name']}); no L2VNIs"))
     bl = DATA.get("baseline")
     if bl:
         checks.append((b, "show ntp peer-status", f"Synchronized (*) to one of {', '.join(bl['ntp'])}, VRF management"))
         checks.append((b, "show tacacs-server", f"Servers {', '.join(bl['tacacs'])}; test login with a TACACS account"))
 
-    if suf in ("NXLF-03", "NXLF-04"):
+    if suf in border_pair():
         bgp(STEP["legacy"], TRUST["name"], "ipv4")
         checks.append((STEP["legacy"], f"show ip route vrf {TRUST['name']} 0.0.0.0/0",
                        f"Via the legacy core (AS {ASN_PLAN[site]['core']}), local preference 50"))
@@ -1323,14 +1341,15 @@ def device_checks(site, idx):
                        f"Up/up as each VLAN is cut over: {svis}"))
         checks.append((STEP["gateways"], f"show fabric forwarding ip local-host-db vrf {TRUST['name']}",
                        "Hosts of the migrated VLANs on this pair are learned"))
-    if suf in ("NXLF-03", "NXLF-04"):
+    if suf in border_pair():
         _, _, fw_ip, _, _ = fw_transit(site, suf)
         checks.append((STEP["firewall"], f"show bgp vrf {TRUST['name']} ipv4 unicast summary",
                        f"Established: {peers(STEP['firewall'], TRUST['name'], 'ipv4')}; 1 prefix received"))
         checks.append((STEP["firewall"], f"show ip route vrf {TRUST['name']} 0.0.0.0/0", f"Via {fw_ip} (eBGP), not the legacy core"))
     elif suf.startswith("NXLF"):
+        b1, b2 = (next(d for d in DEVICES if d[1] == x) for x in border_pair())
         checks.append((STEP["firewall"], f"show ip route vrf {TRUST['name']} 0.0.0.0/0",
-                       f"Via 10.{o}.241.13 and 10.{o}.241.14 (LF-03/LF-04 PIPs), encap VXLAN"))
+                       f"Via 10.{o}.241.{b1[3]} and 10.{o}.241.{b2[3]} ({short(b1[1])}/{short(b2[1])} PIPs), encap VXLAN"))
 
     if suf.startswith("NXBGW"):
         m = STEP["multisite"]
@@ -1341,10 +1360,10 @@ def device_checks(site, idx):
         bgp(m, TRUST["name"], "ipv4")
         po = SITES[S["peer"]]["o"]
         checks.append((m, "show nve peers", f"Includes 10.{po}.241.{BGW_VIP} (the {S['peer']} Multi-Site VIP), Up"))
-        _, _, aws_peer, _, _, az_peer, _ = cloud_links(site, suf)
-        if CLOUD_AWS:
+        _, _, aws_peer, _, _, az_peer, _ = cloud_links(site, suf) if has_cloud(suf) else (None,) * 7
+        if CLOUD_AWS and aws_peer:
             checks.append((m, f"show ip route vrf {TRUST['name']} {CLOUD_AWS[0]}", f"Via {aws_peer} (AWS, AS {AWS_ASN})"))
-        if CLOUD_AZURE:
+        if CLOUD_AZURE and az_peer:
             checks.append((m, f"show ip route vrf {TRUST['name']} {CLOUD_AZURE[0]}", f"Via {az_peer} (Azure, AS {AZURE_ASN})"))
     elif suf.startswith("NXLF"):
         P = SITES[S["peer"]]
@@ -1353,7 +1372,7 @@ def device_checks(site, idx):
             checks.append((STEP["multisite"], f"show ip route vrf {TRUST['name']} 10.{P['o']}.{v}.0/24",
                            f"Via 10.{o}.241.{BGW_VIP} (local BGW Multi-Site VIP), encap VXLAN"))
 
-    if suf in ("NXLF-03", "NXLF-04"):
+    if suf in border_pair():
         core_ip = S["core99"] or f"<{site}-CORE-VLAN{legacy_vlan()}-IP>"
         checks.append((STEP["cleanup"], f"show bgp vrf {TRUST['name']} ipv4 unicast summary",
                        f"No neighbor {core_ip}; migration block removed (Po30, Vlan{legacy_vlan()}, RM-LEGACY-*)"))
@@ -1412,48 +1431,60 @@ def node(x, y, w, h, title, lines, cls):
     return "".join(out)
 
 
+def svg_geometry():
+    """Panel width (grows with the leaf count) and extra height (grows with the BGW count)."""
+    W = max(660, 30 + 163 * len(leafs()) - 22)
+    extra = 78 * (len(bgws()) - 2)
+    return W, extra
+
+
 def site_svg(site, x0):
     S = SITES[site]
     o = S["o"]
     parts = []
-    W = 660
-    parts.append(f'<rect x="{x0}" y="50" width="{W}" height="715" rx="14" class="panel"/>')
+    W, extra = svg_geometry()
+    c = x0 + W / 2 if W != 660 else x0 + 330
+    parts.append(f'<rect x="{x0}" y="50" width="{W}" height="{715 + extra}" rx="14" class="panel"/>')
     parts.append(f'<text x="{x0 + 18}" y="78" class="pt">{site} · {esc(S["city"])} ({esc(S["facility"])})</text>')
     parts.append(f'<text x="{x0 + 18}" y="96" class="ps">10.{o}.0.0/16 · AS {S["asn"]} · Multi-Site ID {S["site_id"]}</text>')
     # firewalls
-    fw = [(x0 + 200, 115), (x0 + 370, 115)]
+    fw = [(int(c - 130), 115), (int(c + 40), 115)]
     for i, (x, y) in enumerate(fw):
         parts.append(node(x, y, 140, 52, S["fws"][i], ["Palo Alto HA A/P", f"eBGP AS {ASN_PLAN[site]['fw']}"], "fw"))
-    parts.append(f'<line x1="{x0 + 340}" y1="141" x2="{x0 + 370}" y2="141" class="ha"/>')
-    # spines
-    spx = [x0 + 120, x0 + 390]
+    parts.append(f'<line x1="{int(c + 10)}" y1="141" x2="{int(c + 40)}" y2="141" class="ha"/>')
+    # spines, centred; 270 apart with two, closer with more
+    ns = len(spines())
+    gap = 270 if ns == 2 else min(270, (W - 40) // ns)
+    spx = [int(c - 75 + (i - (ns - 1) / 2) * gap) for i in range(ns)]
     for i, x in enumerate(spx):
-        parts.append(node(x, 235, 150, 56, host(site, f"NXSP-0{i + 1}"), [f"Nexus 9500 · AS {ASN_PLAN[site]['spine']}", f"Lo0 10.{o}.240.{i + 1}"], "spine"))
+        parts.append(node(x, 235, 150, 56, host(site, spines()[i]), [f"Nexus 9500 · AS {ASN_PLAN[site]['spine']}", f"Lo0 10.{o}.240.{i + 1}"], "spine"))
     # leafs
-    lx = [x0 + 15, x0 + 178, x0 + 341, x0 + 504]
+    ls = leafs()
+    lx = [x0 + 15 + 163 * i for i in range(len(ls))]
     for i, x in enumerate(lx):
-        parts.append(node(x, 415, 141, 70, host(site, f"NXLF-0{i + 1}"),
-                          [("Border-service leaf" if i >= 2 else "Nexus 9300 leaf"), f"Lo0 10.{o}.240.{11 + i}", f"Lo1 10.{o}.241.{11 + i}"], "leaf"))
-    for pi, (a, b) in enumerate([(0, 1), (2, 3)]):
-        cx = (lx[a] + lx[b] + 141) / 2
+        border = ls[i] in border_pair()
+        parts.append(node(x, 415, 141, 70, host(site, ls[i]),
+                          [("Border-service leaf" if border else "Nexus 9300 leaf"), f"Lo0 10.{o}.240.{11 + i}", f"Lo1 10.{o}.241.{11 + i}"], "leaf"))
+    for pi in range(len(leaf_pairs())):
+        cx = (lx[2 * pi] + lx[2 * pi + 1] + 141) / 2
         parts.append(f'<text x="{cx}" y="506" class="ann">vPC {S["vpc"][pi]} · VTEP VIP 10.{o}.241.{101 + pi}</text>')
     # BGWs near the DCI
     left = site == A()
     bx = x0 + W - 175 if left else x0 + 15
-    by = [590, 668]
+    by = [590 + 78 * j for j in range(len(bgws()))]
     for i, y in enumerate(by):
-        parts.append(node(bx, y, 160, 56, host(site, f"NXBGW-0{i + 1}"),
+        parts.append(node(bx, y, 160, 56, host(site, bgws()[i]),
                           [f"Anycast · {bgw_platform().replace('N9K-C', '')}", f"Lo0 10.{o}.240.{21 + i}"], "bgw"))
     vx = bx + 80
-    parts.append(f'<text x="{vx}" y="744" class="ann">Multi-Site VIP 10.{o}.241.200</text>')
-    # day-one cloud on the BGWs (VRF TRUST)
-    cx0 = x0 + 250
+    parts.append(f'<text x="{vx}" y="{744 + extra}" class="ann">Multi-Site VIP 10.{o}.241.200</text>')
+    # day-one cloud on BGW-01/02 (VRF TRUST)
+    cx0 = x0 + 250 if left else x0 + W - 410
     clouds = [("AWS Direct Connect", f"private VIF · 10.{o}.244.0/28", 597), ("Azure ExpressRoute", f"private peering · 10.{o}.244.16/29", 675)]
     for title, sub, y in clouds:
         parts.append(node(cx0, y, 170, 44, title, [sub], "cloud"))
         cx_edge = cx0 + 170 if left else cx0
         b_edge = bx if left else bx + 160
-        for byy in by:
+        for byy in by[:2]:
             parts.append(f'<line x1="{cx_edge}" y1="{y + 22}" x2="{b_edge}" y2="{byy + 28}" class="cl"/>')
     parts.append(f'<text x="{cx0 + 85}" y="590" class="ann">eBGP in VRF TRUST (day one)</text>')
     # links: spine to leafs/BGWs
@@ -1465,22 +1496,25 @@ def site_svg(site, x0):
             parts.append(f'<line x1="{scx}" y1="291" x2="{vx}" y2="{y}" class="ul faint"/>')
     # firewall to border-service leafs
     for (fx, fy) in fw:
-        for x in (lx[2], lx[3]):
+        for x in lx[-2:]:
             parts.append(f'<line x1="{fx + 70}" y1="167" x2="{x + 70}" y2="415" class="fwl"/>')
     e1, e2 = (pt.replace("ethernet", "e") for pt in fw_ports())
-    parts.append(f'<text x="{x0 + W - 20}" y="205" class="ann end">{e1}→LF-03 · {e2}→LF-04 · 10.{o}.244.64/28 · eBGP</text>')
+    b1, b2 = (short(x) for x in border_pair())
+    parts.append(f'<text x="{x0 + W - 20}" y="205" class="ann end">{e1}→{b1} · {e2}→{b2} · 10.{o}.244.64/28 · eBGP</text>')
     # internet
-    parts.append(f'<text x="{x0 + 340}" y="40" class="ann">Internet / ISPs / IPsec mesh (unchanged)</text>')
-    parts.append(f'<line x1="{x0 + 270}" y1="46" x2="{x0 + 270}" y2="115" class="fwl"/>')
-    parts.append(f'<line x1="{x0 + 440}" y1="46" x2="{x0 + 440}" y2="115" class="fwl"/>')
+    parts.append(f'<text x="{int(c + 10)}" y="40" class="ann">Internet / ISPs / IPsec mesh (unchanged)</text>')
+    parts.append(f'<line x1="{int(c - 60)}" y1="46" x2="{int(c - 60)}" y2="115" class="fwl"/>')
+    parts.append(f'<line x1="{int(c + 110)}" y1="46" x2="{int(c + 110)}" y2="115" class="fwl"/>')
     return "".join(parts), bx, by
 
 
 def topology_svg():
+    W, extra = svg_geometry()
+    mid = W + 40
     lvd, lbx, lby = site_svg(A(), 20)
-    sac, sbx, sby = site_svg(B(), 720)
+    sac, sbx, sby = site_svg(B(), W + 60)
     dci = []
-    row = {"NXBGW-01": 0, "NXBGW-02": 1}
+    row = {g: j for j, g in enumerate(bgws())}
     for link in dci_links():
         (s1, b1, _), (s2, b2, _) = link["ends"]
         ya, yb = (lby[row[b1]], sby[row[b2]]) if s1 == A() else (lby[row[b2]], sby[row[b1]])
@@ -1488,22 +1522,23 @@ def topology_svg():
         dci.append(f'<line x1="{lbx + 160}" y1="{ya + 28}" x2="{sbx}" y2="{yb + 28}" class="dci"{dash}/>')
     if DCI_MODE == "full-mesh":
         # straight circuits are carrier A; carrier B crosses over (dashed)
-        dci.append('<text x="700" y="580" class="ann">L3 DCI</text>')
-        dci.append(f'<text x="700" y="{lby[0] + 22}" class="ann small">A</text>')
-        dci.append(f'<text x="700" y="{lby[1] + 22}" class="ann small">A</text>')
-        dci.append('<text x="700" y="762" class="ann small">B: dashed, crossed</text>')
+        dci.append(f'<text x="{mid}" y="580" class="ann">L3 DCI</text>')
+        for y in lby:
+            dci.append(f'<text x="{mid}" y="{y + 22}" class="ann small">A</text>')
+        dci.append(f'<text x="{mid}" y="{762 + extra}" class="ann small">B: dashed, crossed</text>')
     else:
-        dci.append('<text x="700" y="660" class="ann">L3 DCI</text>')
-        dci.append(f'<text x="700" y="{lby[0] + 22}" class="ann small">A</text>')
-        dci.append(f'<text x="700" y="{lby[1] + 22}" class="ann small">B</text>')
-    dci.append('<text x="700" y="790" class="ann">eBGP between BGWs: IPv4 (BGW loopbacks) + L2VPN EVPN (VRF TRUST type-5: site /16 + approved cloud prefixes)</text>')
+        dci.append(f'<text x="{mid}" y="{660 + extra}" class="ann">L3 DCI</text>')
+        for j, y in enumerate(lby):
+            dci.append(f'<text x="{mid}" y="{y + 22}" class="ann small">{"AB"[j % 2]}</text>')
+    dci.append(f'<text x="{mid}" y="{790 + extra}" class="ann">eBGP between BGWs: IPv4 (BGW loopbacks) + L2VPN EVPN (VRF TRUST type-5: site /16 + approved cloud prefixes)</text>')
+    ly = 815 + extra
     legend = ('<g class="legend">'
-              '<line x1="40" y1="815" x2="80" y2="815" class="ul"/><text x="88" y="819">eBGP underlay /31 + MP-BGP EVPN (eBGP, loopbacks)</text>'
-              '<line x1="360" y1="815" x2="400" y2="815" class="fwl"/><text x="408" y="819">Firewall handoff (routed /29, eBGP)</text>'
-              '<line x1="700" y1="815" x2="740" y2="815" class="dci"/><text x="748" y="819">DCI (eBGP)</text>'
-              '<line x1="880" y1="815" x2="920" y2="815" class="ha"/><text x="928" y="819">HA link</text>'
-              '<line x1="1020" y1="815" x2="1060" y2="815" class="cl"/><text x="1068" y="819">AWS / Azure (eBGP)</text></g>')
-    return (f'<svg viewBox="0 0 1400 835" role="img" aria-label="{A()} and {B()} EVPN Multi-Site topology" class="topo">'
+              f'<line x1="40" y1="{ly}" x2="80" y2="{ly}" class="ul"/><text x="88" y="{ly + 4}">eBGP underlay /31 + MP-BGP EVPN (eBGP, loopbacks)</text>'
+              f'<line x1="360" y1="{ly}" x2="400" y2="{ly}" class="fwl"/><text x="408" y="{ly + 4}">Firewall handoff (routed /29, eBGP)</text>'
+              f'<line x1="700" y1="{ly}" x2="740" y2="{ly}" class="dci"/><text x="748" y="{ly + 4}">DCI (eBGP)</text>'
+              f'<line x1="880" y1="{ly}" x2="920" y2="{ly}" class="ha"/><text x="928" y="{ly + 4}">HA link</text>'
+              f'<line x1="1020" y1="{ly}" x2="1060" y2="{ly}" class="cl"/><text x="1068" y="{ly + 4}">AWS / Azure (eBGP)</text></g>')
+    return (f'<svg viewBox="0 0 {2 * W + 80} {835 + extra}" role="img" aria-label="{A()} and {B()} EVPN Multi-Site topology" class="topo">'
             f'{lvd}{sac}{"".join(dci)}{legend}</svg>')
 
 
@@ -1584,10 +1619,11 @@ def build():
     sec.append(("firewall", "7. Firewall integration", "\n" + d["firewall"] + panos + "\n"))
 
     ms = d["multisite"]
+    bgw_lo0 = "/.".join(str(x[2]) for x in DEVICES if x[1].startswith("NXBGW"))
     ms_rows = [
         ["Multi-Site site ID", str(SITES[a]["site_id"]), str(SITES[b]["site_id"])],
         ["BGW Multi-Site VIP (loopback100)", mono(f"10.{oa}.241.{BGW_VIP}/32"), mono(f"10.{ob}.241.{BGW_VIP}/32")],
-        ["BGW Lo0", mono(f"10.{oa}.240.21/.22"), mono(f"10.{ob}.240.21/.22")],
+        ["BGW Lo0", mono(f"10.{oa}.240.{bgw_lo0}"), mono(f"10.{ob}.240.{bgw_lo0}")],
         (["DCI underlay", f"Full mesh: every BGW has one circuit on each carrier, to a different {b} BGW",
           f"Full mesh: every BGW has one circuit on each carrier, to a different {a} BGW"]
          if DCI_MODE == "full-mesh" else

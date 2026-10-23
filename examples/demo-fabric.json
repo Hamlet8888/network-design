@@ -1,6 +1,11 @@
 {
   "_comment": "FICTIONAL demo data for fabric_design. Safe to commit.",
   "hostname_format": "{site}-{role}",
+  "topology": {
+    "spines": 2,
+    "leaf_pairs": 2,
+    "bgws": 2
+  },
   "sites": [
     {
       "code": "DC1",

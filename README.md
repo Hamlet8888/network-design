@@ -49,6 +49,23 @@ python3 -m fabric_design.build private/<name>.json --out private/<name>
 The data file holds everything environment-specific: site codes and /16s, ASNs, VLANs, firewall names and
 ports, cloud allowlists and the workbook narrative.
 
+### Topology size
+
+`"topology": {"spines": 2, "leaf_pairs": 2, "bgws": 2}` sets the switch count per site (these are the
+defaults). Spines 2-4, leaf pairs 2-5 (the last pair is the border-service pair facing the firewalls) and
+2 or 4 BGWs. The site data then needs one vPC domain per leaf pair and an `asn` entry per leaf and BGW;
+validation lists any that are missing.
+
+| Item | Grows as |
+|---|---|
+| Leaf/BGW uplinks | Eth1/49 onward, one per spine; BGW DCI ports follow (Eth1/51-52 with two spines, Eth1/53-54 with four) |
+| Loopbacks | Spines .1-.4, leafs .11-.20, BGWs .21-.24, vPC VIPs .101-.105 |
+| mgmt0 | Spines .11-.14, leafs .21-.30, BGWs .31-.34 |
+| DCI | BGWs pair up: carrier A joins namesakes, carrier B crosses within each pair (full mesh) |
+| Cloud | AWS DX and Azure ER stay on BGW-01/02 |
+
+The consistency tests also run on a 4-spine, 3-pair, 4-BGW build in both DCI modes.
+
 ### Day-2 checks
 
 `checks/<switch>.txt` lists, for every switch and migration step (M1 build to M6 legacy retirement), the
