@@ -130,6 +130,9 @@
   "dci": {
     "mode": "full-mesh"
   },
+  "platforms": {
+    "bgw": "N9K-C93180YC-FX3"
+  },
   "cloud": {
     "aws_asn": 64512,
     "azure_asn": 12076,
@@ -198,7 +201,7 @@
     "classification": "FICTIONAL DEMO DATA: not for any real network.",
     "classification_short": "DEMO DATA.",
     "baseline_note": "Apply your own baseline.",
-    "summary": "<p>Two independent Nexus EVPN/VXLAN fabrics, one per data center, joined by dedicated Multi-Site border gateways over a redundant routed DCI. Each site has 2 × Nexus 9500 spines (EVPN route servers), 4 × Nexus 9300 leafs in two vPC pairs and 2 × Nexus 9300 BGWs, with a Palo Alto HA pair at the north-south edge.</p>\n<p><b>BGP only:</b> eBGP IPv4 underlay on the /31 links, MP-BGP L2VPN EVPN overlay (eBGP between loopbacks), eBGP to the firewalls, across the DCI and to AWS/Azure. BFD on every session.</p>\n<ul>\n<li><b>Each site keeps all infrastructure inside its own /16</b> (<code>10.110.0.0/16</code> for DC1, <code>10.120.0.0/16</code> for DC2), in the 10.x.240.0/21 block.</li>\n<li><b>Only routed traffic crosses the DCI.</b> Each site has its own L2VNIs; nothing is stretched by default.</li>\n<li><b>AWS Direct Connect and Azure ExpressRoute</b> terminate on the BGWs in VRF TRUST at both sites.</li>\n</ul>",
+    "summary": "<p>Two independent Nexus EVPN/VXLAN fabrics, one per data center, joined by dedicated Multi-Site border gateways over a redundant routed DCI. Each site has 2 × Nexus 9500 spines (EVPN route servers), 4 × Nexus 9300 leafs in two vPC pairs and 2 × Nexus 93180YC-FX3 anycast BGWs, with a Palo Alto HA pair at the north-south edge.</p>\n<p><b>BGP only:</b> eBGP IPv4 underlay on the /31 links, MP-BGP L2VPN EVPN overlay (eBGP between loopbacks), eBGP to the firewalls, across the DCI and to AWS/Azure. BFD on every session.</p>\n<ul>\n<li><b>Each site keeps all infrastructure inside its own /16</b> (<code>10.110.0.0/16</code> for DC1, <code>10.120.0.0/16</code> for DC2), in the 10.x.240.0/21 block.</li>\n<li><b>Only routed traffic crosses the DCI.</b> Each site has its own L2VNIs; nothing is stretched by default.</li>\n<li><b>AWS Direct Connect and Azure ExpressRoute</b> terminate on the BGWs in VRF TRUST at both sites.</li>\n</ul>",
     "current": {
       "intro": "<p>The demo assumes a typical starting point: a legacy core per site, routed to an HA firewall pair.</p>",
       "rows": [
@@ -288,6 +291,13 @@
         "Cloud",
         "AWS DX and Azure ER on the BGWs in VRF TRUST, strict allowlists",
         "Cloud prefixes cross the DCI as type-5 backup paths.",
+        "Recommended"
+      ],
+      [
+        "D10",
+        "Border gateways",
+        "Dedicated anycast BGWs, two per site, on N9K-C93180YC-FX3: Eth1/49-50 to the spines, Eth1/51-52 DCI, Eth1/53-54 spare, AWS and Azure on their own SFP28 ports",
+        "Cisco's standard Multi-Site model: every BGW forwards, the site scales to more BGWs without redesign, and no vPC or endpoints sit on the BGWs. vPC BGW only fits when hosts must dual-home to the border; BGW-on-spine overloads the spines.",
         "Recommended"
       ]
     ],
@@ -442,7 +452,7 @@
     "open_items": [
       [
         "Hardware",
-        "Nexus models, port maps, NX-OS release."
+        "Spine and leaf models, port maps, NX-OS release. BGWs: N9K-C93180YC-FX3 (confirm optics for the DCI and the 10G cloud cross-connects)."
       ],
       [
         "Carriers",

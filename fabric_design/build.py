@@ -164,11 +164,15 @@ DEVICES = [
     ("Leaf / VTEP", "NXLF-02", 12, 12, 101, 22, 0),
     ("Border-service leaf / VTEP", "NXLF-03", 13, 13, 102, 23, 1),
     ("Border-service leaf / VTEP", "NXLF-04", 14, 14, 102, 24, 1),
-    ("Multi-Site BGW", "NXBGW-01", 21, 21, None, 31, None),
-    ("Multi-Site BGW", "NXBGW-02", 22, 22, None, 32, None),
+    ("Multi-Site anycast BGW", "NXBGW-01", 21, 21, None, 31, None),
+    ("Multi-Site anycast BGW", "NXBGW-02", 22, 22, None, 32, None),
 ]
 DOWNSTREAM = ["NXLF-01", "NXLF-02", "NXLF-03", "NXLF-04", "NXBGW-01", "NXBGW-02"]
 BGW_VIP = 200
+# BGW port plan (Nexus 9300 with 48 x SFP28 + 6 x QSFP28, e.g. N9K-C93180YC-FX3): Eth1/49-50 to the
+# spines, Eth1/51-52 DCI, Eth1/53-54 spare for DCI growth; cloud circuits on their own SFP28 ports,
+# one per provider, since DX and ER arrive as separate cross-connects.
+AWS_PORT, AZURE_PORT = "Ethernet1/1", "Ethernet1/2"
 ANYCAST_MAC = "2020.0000.00aa"
 
 TRUST = dict(name="TRUST", id=10, l3vni=50010, vlan=3910, rt="65000:50010")
@@ -195,7 +199,7 @@ def dci_links():
     owning site takes the even address. "pair" gives each BGW one circuit: carrier A joins the
     BGW-01s, carrier B the BGW-02s (Eth1/51). "full-mesh" gives each BGW one circuit per carrier
     to a different remote BGW: carrier A joins 01-01 and 02-02 (Eth1/51), carrier B crosses over,
-    B-01 to A-02 and B-02 to A-01 (Eth1/53). A carrier or a BGW can then fail and every surviving
+    B-01 to A-02 and B-02 to A-01 (Eth1/52). A carrier or a BGW can then fail and every surviving
     BGW keeps a DCI path, so no BGW is isolated by a single failure.
     """
     a, b = A(), B()
@@ -203,8 +207,8 @@ def dci_links():
     if DCI_MODE == "full-mesh":
         spec = [("A", "Ethernet1/51", oa, a, "NXBGW-01", b, "NXBGW-01"),
                 ("A", "Ethernet1/51", oa, a, "NXBGW-02", b, "NXBGW-02"),
-                ("B", "Ethernet1/53", ob, b, "NXBGW-02", a, "NXBGW-01"),
-                ("B", "Ethernet1/53", ob, b, "NXBGW-01", a, "NXBGW-02")]
+                ("B", "Ethernet1/52", ob, b, "NXBGW-02", a, "NXBGW-01"),
+                ("B", "Ethernet1/52", ob, b, "NXBGW-01", a, "NXBGW-02")]
     else:
         spec = [("A", "Ethernet1/51", oa, a, "NXBGW-01", b, "NXBGW-01"),
                 ("B", "Ethernet1/51", ob, b, "NXBGW-02", a, "NXBGW-02")]
@@ -226,6 +230,14 @@ def bgw_dci(site, bgw):
                 fs, fb, fip = link["ends"][1 - i]
                 out.append((link["carrier"], link["port"], ip, fs, fb, fip))
     return sorted(out)
+
+
+def bgw_platform():
+    return DATA.get("platforms", {}).get("bgw", "Nexus 9300")
+
+
+def short_port(port):
+    return "Eth" + port[len("Ethernet"):]
 
 
 def host(s, suffix):
@@ -346,9 +358,9 @@ def cloud_rows():
     for site in SITE_ORDER:
         for bgw in ("NXBGW-01", "NXBGW-02"):
             aws_net, aws_me, aws_peer, az_net, az_me, az_peer, (dx, er) = cloud_links(site, bgw)
-            rows.append([f"{site} AWS DX {dx}", f"{esc(host(site, bgw))} Eth1/52.&lt;VIF VLAN&gt; " + mono(f"{aws_me}/30"),
+            rows.append([f"{site} AWS DX {dx}", f"{esc(host(site, bgw))} {short_port(AWS_PORT)}.&lt;VIF VLAN&gt; " + mono(f"{aws_me}/30"),
                          f"AWS (AS {AWS_ASN}) " + mono(aws_peer), "Private VIF, VRF TRUST, BFD, MD5"])
-            rows.append([f"{site} Azure ER {er}", f"{esc(host(site, bgw))} Eth1/52.&lt;ER VLAN&gt; " + mono(f"{az_me}/30"),
+            rows.append([f"{site} Azure ER {er}", f"{esc(host(site, bgw))} {short_port(AZURE_PORT)}.&lt;ER VLAN&gt; " + mono(f"{az_me}/30"),
                          f"Microsoft MSEE (AS {AZURE_ASN}) " + mono(az_peer), "Private peering, VRF TRUST, BFD"])
     return rows
 
@@ -899,13 +911,14 @@ interface Ethernet1/50
 {dci_if}
 
 ! ---- day-one cloud handoff (VRF TRUST) --------------------------------
-interface Ethernet1/52
-  description Cloud handoff: AWS DX {dx_conn} + Azure ER {er_link}
+! Routed subinterfaces only: an anycast BGW takes no endpoints, access ports or BGW-local VLANs.
+interface {AWS_PORT}
+  description AWS Direct Connect {dx_conn} (10G cross-connect)
   no switchport
   mtu 9216
   no shutdown
 
-interface Ethernet1/52.<AWS-VIF-VLAN>
+interface {AWS_PORT}.<AWS-VIF-VLAN>
   description AWS Direct Connect private VIF ({dx_conn})
   encapsulation dot1q <AWS-VIF-VLAN>    ! VLAN set on the VIF / by the hosted provider
   mtu 1500                              ! 9001 if the VIF is created with jumbo frames
@@ -914,7 +927,13 @@ interface Ethernet1/52.<AWS-VIF-VLAN>
   ip address {aws_me}/30
   no shutdown
 
-interface Ethernet1/52.<ER-VLAN>
+interface {AZURE_PORT}
+  description Azure ExpressRoute {er_link} link (10G cross-connect)
+  no switchport
+  mtu 9216
+  no shutdown
+
+interface {AZURE_PORT}.<ER-VLAN>
   description Azure ExpressRoute private peering ({er_link} link)
   encapsulation dot1q <ER-VLAN>         ! VLAN ID configured on the ER private peering
   mtu 1500                              ! ExpressRoute MTU is 1500
@@ -1085,9 +1104,10 @@ interface mgmt0
 
 def header(site, idx):
     role, suf = DEVICES[idx][0], DEVICES[idx][1]
+    platform = f" · {bgw_platform()}" if suf.startswith("NXBGW") else ""
     return f"""
 !==============================================================================
-! {host(site, suf)} · {role} · BGP AS {dev_asn(site, suf)}
+! {host(site, suf)} · {role} · BGP AS {dev_asn(site, suf)}{platform}
 ! {DATA['doc']['config_title']}
 ! {DATA['doc']['classification']}
 ! Template: validate against the exact Nexus model and NX-OS release before use.
@@ -1167,7 +1187,8 @@ def site_svg(site, x0):
     bx = x0 + W - 175 if left else x0 + 15
     by = [590, 668]
     for i, y in enumerate(by):
-        parts.append(node(bx, y, 160, 56, host(site, f"NXBGW-0{i + 1}"), ["Multi-Site BGW", f"Lo0 10.{o}.240.{21 + i}"], "bgw"))
+        parts.append(node(bx, y, 160, 56, host(site, f"NXBGW-0{i + 1}"),
+                          [f"Anycast · {bgw_platform().replace('N9K-C', '')}", f"Lo0 10.{o}.240.{21 + i}"], "bgw"))
     vx = bx + 80
     parts.append(f'<text x="{vx}" y="744" class="ann">Multi-Site VIP 10.{o}.241.200</text>')
     # day-one cloud on the BGWs (VRF TRUST)
@@ -1254,7 +1275,7 @@ def build():
 
     dci_rows = []
     for link in dci_links():
-        port = "Eth" + link["port"][len("Ethernet"):]
+        port = short_port(link["port"])
         (s1, b1, ip1), (s2, b2, ip2) = link["ends"]
         dci_rows.append([f"Carrier {link['carrier']}", host(s1, b1) + f" {port} " + mono(f"{ip1}/31"),
                          host(s2, b2) + f" {port} " + mono(f"{ip2}/31"), f"{s1} owns the addressing"])

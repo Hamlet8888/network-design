@@ -399,7 +399,46 @@ class FabricConsistencyTest(unittest.TestCase):
             remote = {str(x.loopback(n)) + "/32" for x in self.role_devs("NXBGW", other) for n in (0, 1, 100)}
             self.assertEqual({line.split()[-1] for line in pl["PL-BGW-REMOTE"]}, remote, c.name)
 
-    def test_default_route_never_crosses_the_dci(self):
+    def test_anycast_bgws_carry_no_endpoints(self):
+        """Anycast BGWs take routed links only: no switchports, no VLANs or SVIs besides the L3VNI."""
+        for c in self.role_devs("NXBGW"):
+            for ifname, node in c.interfaces.items():
+                lines = [x.line for x in node.children]
+                self.assertFalse(any(l.startswith("switchport") for l in lines), f"{c.name} {ifname} is a switchport")
+                if ifname.startswith("Ethernet"):
+                    self.assertTrue("no switchport" in lines or "." in ifname, f"{c.name} {ifname} is not routed")
+                if ifname.startswith("Vlan"):
+                    self.assertEqual(ifname, f"Vlan{build.TRUST['vlan']}", c.name)
+            self.assertEqual(set(c.vlan_segments()), {build.TRUST["vlan"]}, c.name)
+            self.assertEqual(c.top("feature vpc"), [], c.name)
+
+    def test_cloud_providers_land_on_separate_routed_ports(self):
+        for c in self.role_devs("NXBGW"):
+            parents = {}
+            for ifname, node in c.interfaces.items():
+                desc = (node.values("description") or [""])[0]
+                if "." in ifname:
+                    parent = ifname.split(".")[0]
+                    self.assertIn(parent, c.interfaces, f"{c.name} {ifname} has no parent interface")
+                    provider = "aws" if "AWS" in desc else "azure" if "Azure" in desc else None
+                    self.assertIsNotNone(provider, f"{c.name} {ifname}: {desc}")
+                    parents.setdefault(provider, set()).add(parent)
+            self.assertEqual(set(parents), {"aws", "azure"}, c.name)
+            self.assertTrue(parents["aws"].isdisjoint(parents["azure"]), f"{c.name}: AWS and Azure share {parents}")
+
+    def test_no_physical_port_is_defined_twice(self):
+        for c in self.cfg.values():
+            seen = collections.Counter()
+            for n in c.top("interface"):
+                name = n.line.split(None, 1)[1]
+                if name.startswith("Ethernet") and "." not in name:
+                    m = re.fullmatch(r"Ethernet(\d+)/(\d+)(?:-(\d+))?", name)
+                    for port in range(int(m.group(2)), int(m.group(3) or m.group(2)) + 1):
+                        seen[f"Ethernet{m.group(1)}/{port}"] += 1
+            dup = [p for p, k in seen.items() if k > 1]
+            self.assertEqual(dup, [], c.name)
+
+
         for c in self.role_devs("NXBGW"):
             for name, lines in c.prefix_lists().items():
                 for line in lines:
