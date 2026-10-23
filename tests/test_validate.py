@@ -87,6 +87,23 @@ class ValidateTest(unittest.TestCase):
         self.assertEqual(build.DCI_MODE, "pair")
         self.assertEqual(len(build.dci_links()), 2)
 
+    def test_baseline_bad_server(self):
+        self.rejects(lambda d: d["baseline"]["ntp"].append("ntp.example.net"), "baseline ntp")
+
+    def test_baseline_banner_delimiter(self):
+        self.rejects(lambda d: d["baseline"]["banner"].append("a ^ b"), "banner")
+
+    def test_without_baseline_header_says_so(self):
+        data = copy.deepcopy(self.data)
+        del data["baseline"]
+        with tempfile.TemporaryDirectory() as tmp:
+            src = Path(tmp, "d.json")
+            src.write_text(json.dumps(data))
+            self.assertEqual(build.main([str(src), "--out", tmp]), 0)
+            txt = Path(tmp, "configs", "DC1-NXSP-01.cfg").read_text()
+            self.assertIn("Not included: AAA/TACACS", txt)
+            self.assertNotIn("feature tacacs+", txt)
+
     def test_all_errors_reported_together(self):
         def two(d):
             d["sites"][1]["asn"]["fw"] = 65217

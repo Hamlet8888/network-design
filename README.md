@@ -49,6 +49,15 @@ python3 -m fabric_design.build private/<name>.json --out private/<name>
 The data file holds everything environment-specific: site codes and /16s, ASNs, VLANs, firewall names and
 ports, cloud allowlists and the workbook narrative.
 
+### Management baseline
+
+An optional `"baseline"` block adds the management plane to every switch, all of it in VRF management
+from mgmt0: TACACS+ AAA with local fallback, NTP, syslog, SNMPv3 (no communities), DNS, CoPP `strict`,
+SSH-only vty limited to the `mgmt_acl` subnets, exec timeouts and a login banner. Secrets are never in
+the data file or the output: keys and hashes are `<PLACEHOLDERS>` to fill in from your vault at
+deployment, and a test fails if one is ever written in clear. Without the block, the configs say the
+baseline is not included.
+
 ### Border gateways
 
 The BGWs follow Cisco's standard Multi-Site model: two dedicated anycast BGWs per site, sharing the site's

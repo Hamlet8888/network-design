@@ -497,7 +497,61 @@ class FabricConsistencyTest(unittest.TestCase):
                     lines = [x.line for x in af.children]
                     self.assertIn("send-community extended", lines, f"{c.name} {ip}")
 
-    # -- firewall handoff -----------------------------------------------------
+    # -- management baseline --------------------------------------------------
+    def test_baseline_is_on_every_switch(self):
+        bl = self.data["baseline"]
+        for c in self.cfg.values():
+            top = [n.line for n in c.root.children]
+            for line in ("no feature telnet", "feature tacacs+", "copp profile strict",
+                         "aaa authentication login default group TACACS", "ntp source-interface mgmt0",
+                         "logging source-interface mgmt0", "snmp-server source-interface traps mgmt0"):
+                self.assertIn(line, top, c.name)
+            self.assertEqual({l.split()[2] for l in top if l.startswith("ntp server")}, set(bl["ntp"]), c.name)
+            self.assertEqual({l.split()[2] for l in top if l.startswith("logging server")}, set(bl["syslog"]), c.name)
+            self.assertEqual({l.split()[2] for l in top if l.startswith("tacacs-server host")}, set(bl["tacacs"]), c.name)
+            vrf = [n for n in c.top("vrf context") if n.line == "vrf context management"]
+            self.assertEqual(len(vrf), 1, c.name)
+            self.assertEqual(set(vrf[0].values("ip name-server")), set(bl["dns"]), c.name)
+
+    def test_management_services_use_the_management_vrf(self):
+        for c in self.cfg.values():
+            for n in c.root.children:
+                if n.line.startswith(("ntp server", "logging server")):
+                    self.assertIn("use-vrf management", n.line, f"{c.name}: {n.line}")
+            hosts = {n.line.split()[2] for n in c.top("snmp-server host")}
+            for h in hosts:
+                self.assertIn(f"snmp-server host {h} use-vrf management", [n.line for n in c.root.children], c.name)
+            group = c.top("aaa group server tacacs+")
+            self.assertEqual(len(group), 1, c.name)
+            self.assertEqual(group[0].values("use-vrf"), ["management"], c.name)
+
+    def test_vty_access_is_restricted_to_ssh_from_management(self):
+        nets = [ipaddress.ip_network(n) for n in self.data["baseline"]["mgmt_acl"]]
+        for c in self.cfg.values():
+            vty = c.top("line vty")[0]
+            acl_name = vty.values("access-class")[0].split()[0]
+            acl = c.top(f"ip access-list {acl_name}")
+            self.assertEqual(len(acl), 1, f"{c.name}: access-class {acl_name} is not defined")
+            rules = [x.line for x in acl[0].children]
+            self.assertTrue(rules[-1].endswith("deny ip any any log"), c.name)
+            for r in rules[:-1]:
+                p = r.split()
+                self.assertEqual((p[1], p[2], p[5], p[6]), ("permit", "tcp", "eq", "22"), f"{c.name}: {r}")
+                self.assertIn(ipaddress.ip_network(p[3]), nets)
+            # every switch's own mgmt0 subnet can reach it
+            mgmt0 = ipaddress.ip_interface(c.interfaces["mgmt0"].values("ip address")[0]).network
+            self.assertTrue(any(mgmt0.subnet_of(n) for n in nets), c.name)
+
+    def test_no_secret_is_written_in_clear(self):
+        """Keys, community strings and password hashes are always <placeholders>."""
+        pats = [r"\bkey 7 (\S+)", r"\bpassword 5 (\S+)", r"\bauth sha (\S+)", r"\bpriv aes-128 (\S+)",
+                r"\bpassword (?!5 |strength)(\S+)", r"snmp-server community (\S+)"]
+        for c in self.cfg.values():
+            for pat in pats:
+                for m in re.finditer(pat, c.text):
+                    self.assertRegex(m.group(1), r"^<[A-Z0-9-]+>$", f"{c.name}: {m.group(0)}")
+
+
     def test_panos_handoff_matches_the_border_leafs(self):
         for site, text in self.panos.items():
             fw_as = re.search(r"protocol bgp local-as (\d+)", text).group(1)

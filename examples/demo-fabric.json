@@ -133,6 +133,44 @@
   "platforms": {
     "bgw": "N9K-C93180YC-FX3"
   },
+  "baseline": {
+    "_comment": "Fictional shared-services addresses, reached through VRF management. Secrets are never stored here.",
+    "domain": "dc.example.net",
+    "dns": [
+      "10.250.0.53",
+      "10.250.1.53"
+    ],
+    "ntp": [
+      "10.250.0.123",
+      "10.250.1.123"
+    ],
+    "syslog": [
+      "10.250.0.40"
+    ],
+    "syslog_level": 5,
+    "tacacs": [
+      "10.250.0.49",
+      "10.250.1.49"
+    ],
+    "snmp": {
+      "user": "nms-ro",
+      "hosts": [
+        "10.250.0.162"
+      ],
+      "contact": "noc@example.net"
+    },
+    "mgmt_acl": [
+      "10.110.245.0/24",
+      "10.120.245.0/24",
+      "10.250.0.0/23"
+    ],
+    "timezone": "UTC",
+    "exec_timeout": 10,
+    "banner": [
+      "Authorized access only. Activity is logged and monitored.",
+      "Disconnect now if you are not an authorized user."
+    ]
+  },
   "cloud": {
     "aws_asn": 64512,
     "azure_asn": 12076,
