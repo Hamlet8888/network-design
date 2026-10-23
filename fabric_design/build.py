@@ -1454,7 +1454,8 @@ def expected_device(site, idx):
     me = DEVICES[idx]
     suf = me[1]
     dev = dict(hostname=host(site, suf), site=site, role=device_role(suf), asn=dev_asn(site, suf),
-               router_id=f"10.{o}.240.{me[2]}", interfaces=fabric_interfaces(site, idx), bgp=[])
+               router_id=f"10.{o}.240.{me[2]}", mgmt=f"10.{o}.245.{me[5]}",
+               interfaces=fabric_interfaces(site, idx), bgp=[])
     for step, vrf, afi, ip, asn, name in bgp_sessions(site, idx):
         legacy = name == "legacy core"
         s = dict(step=step, vrf=vrf, afi=afi, neighbor=ip, remote_as=asn, peer=name,

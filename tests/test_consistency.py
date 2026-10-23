@@ -559,6 +559,7 @@ class FabricConsistencyTest(unittest.TestCase):
             c = self.cfg[dev["hostname"]]
             self.assertEqual(str(c.loopback(0)), dev["router_id"], c.name)
             self.assertEqual(c.asn, dev["asn"], c.name)
+            self.assertEqual(c.interfaces["mgmt0"].values("ip address")[0].split("/")[0], dev["mgmt"], c.name)
             configured = {}
             for vrf, ip, n in c.neighbors():
                 for af in n.find("address-family"):
