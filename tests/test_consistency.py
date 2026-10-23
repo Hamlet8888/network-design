@@ -550,6 +550,58 @@ class FabricConsistencyTest(unittest.TestCase):
                 domain = c.top("vpc domain")[0].line.split()[-1]
                 self.assertTrue(checks["show vpc brief"].startswith(f"Domain {domain}:"), c.name)
 
+    def test_expected_state_matches_the_configs(self):
+        """expected-state.json describes exactly what each config sets up: sessions, BFD, MTU, VNIs, RTs, vPC."""
+        state = build.expected_state()
+        self.assertEqual(sorted(d["hostname"] for d in state["devices"]), sorted(self.cfg))
+        steps = [s["id"] for s in state["steps"]]
+        for dev in state["devices"]:
+            c = self.cfg[dev["hostname"]]
+            self.assertEqual(str(c.loopback(0)), dev["router_id"], c.name)
+            self.assertEqual(c.asn, dev["asn"], c.name)
+            configured = {}
+            for vrf, ip, n in c.neighbors():
+                for af in n.find("address-family"):
+                    afi = "evpn" if af.line == "address-family l2vpn evpn" else "ipv4"
+                    configured[(vrf, ip, afi)] = (int(n.values("remote-as")[0]), bool(n.find("bfd")))
+            expected = {(s["vrf"], s["neighbor"], s["afi"]): (s["remote_as"], s["bfd"]) for s in dev["bgp"]}
+            self.assertEqual(expected, configured, c.name)
+            for s in dev["bgp"]:
+                self.assertIn(s["step"], steps, c.name)
+                self.assertLess(steps.index(s["step"]), steps.index(s.get("until", steps[-1])) + 1, c.name)
+            for ifname, want in dev["interfaces"].items():
+                node = c.interfaces[ifname]
+                self.assertEqual(node.values("mtu"), [str(want["mtu"])], f"{c.name} {ifname}")
+                self.assertEqual(node.values("ip address")[0].split()[0], want["address"], f"{c.name} {ifname}")
+            if dev["role"] == "spine":
+                self.assertNotIn("vnis", dev, c.name)
+                continue
+            _, l2, l3 = c.nve()
+            want_l2 = {v["vni"]: v for v in dev["vnis"] if v["type"] == "L2"}
+            want_l3 = [v for v in dev["vnis"] if v["type"] == "L3"]
+            self.assertEqual(set(want_l2), l2, c.name)
+            self.assertEqual({v["vni"] for v in want_l3}, l3, c.name)
+            for vni, rts in c.evpn_l2vnis().items():
+                self.assertEqual(rts["import"], {want_l2[vni]["route_target"]}, f"{c.name} vni {vni}")
+                self.assertEqual(rts["export"], {want_l2[vni]["route_target"]}, f"{c.name} vni {vni}")
+                self.assertEqual(c.vlan_segments()[want_l2[vni]["vlan"]], vni, f"{c.name} vni {vni}")
+            for v in want_l3:
+                self.assertEqual(c.vrfs()[v["vrf"]]["vni"], v["vni"], c.name)
+                self.assertEqual({rt for _, rt, _ in c.vrfs()[v["vrf"]]["rts"]}, {v["route_target"]}, c.name)
+            self.assertEqual(str(c.loopback(1)), dev["nve"]["primary"], c.name)
+            if "vpc" in dev:
+                self.assertEqual(c.top("vpc domain")[0].line, f"vpc domain {dev['vpc']['domain']}", c.name)
+                keepalive = c.top("vpc domain")[0].values("peer-keepalive destination")[0].split()[0]
+                self.assertEqual(keepalive, dev["vpc"]["keepalive"], c.name)
+                self.assertIn(dev["nve"]["secondary"], c.interfaces["loopback1"].values("ip address")[1], c.name)
+            if "multisite" in dev:
+                ms = dev["multisite"]
+                self.assertEqual(c.top("evpn multisite border-gateway")[0].line.split()[-1], str(ms["site_id"]), c.name)
+                self.assertEqual(c.interfaces["loopback100"].values("ip address"), [f"{ms['vip']}/32"], c.name)
+                self.assertEqual(sorted(i for i in c.interfaces if self.is_dci(c, i)), ms["dci_links"], c.name)
+                tracked = sorted(i for i, n in c.interfaces.items() if n.find("evpn multisite fabric-tracking"))
+                self.assertEqual(tracked, ms["fabric_links"], c.name)
+
     def test_every_check_step_is_in_the_migration_table(self):
         steps = [r[0] for r in self.data["doc"]["migration"]]
         for c in self.cfg.values():

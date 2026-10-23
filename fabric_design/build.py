@@ -1405,6 +1405,102 @@ def write_checks(outdir):
     return len(everything)
 
 
+# ---------------------------------------------------------------------------
+# Expected state: the design as data, for network-automation-tools to audit against
+# ---------------------------------------------------------------------------
+EXPECTED_STATE_SCHEMA = 1
+
+
+def device_role(suf):
+    if suf.startswith("NXSP"):
+        return "spine"
+    if suf.startswith("NXBGW"):
+        return "bgw"
+    return "border-leaf" if suf in border_pair() else "leaf"
+
+
+def fabric_interfaces(site, idx):
+    """{interface: dict(mtu, peer, address)} for every routed fabric link of one switch.
+
+    Spine links on every switch, the vPC backup underlay SVI on leafs and the DCI ports on BGWs.
+    """
+    o = SITES[site]["o"]
+    me = DEVICES[idx]
+    suf = me[1]
+    out = {}
+    if suf.startswith("NXSP"):
+        for di, down in enumerate(DOWNSTREAM):
+            a, _ = p2p(site, idx, di)
+            out[f"Ethernet1/{di + 1}"] = dict(mtu=9216, peer=host(site, down), address=f"{a}/31")
+        return out
+    di = DOWNSTREAM.index(suf)
+    for si, spine in enumerate(spines()):
+        _, a = p2p(site, si, di)
+        out[uplink(si)] = dict(mtu=9216, peer=host(site, spine), address=f"{a}/31")
+    if suf.startswith("NXLF"):
+        mate = DEVICES[idx + 1] if idx % 2 == 0 else DEVICES[idx - 1]
+        k = me[6] * 8
+        bk_me = k + 5 if idx % 2 == 0 else k + 6
+        out["Vlan3900"] = dict(mtu=9216, peer=host(site, mate[1]), address=f"10.{o}.243.{bk_me}/30")
+    for carrier, port, ip, rs, rb, _ in (bgw_dci(site, suf) if suf.startswith("NXBGW") else []):
+        out[port] = dict(mtu=9216, peer=host(rs, rb), address=f"{ip}/31", dci_carrier=carrier)
+    return out
+
+
+def expected_device(site, idx):
+    """Everything an auditor should find on one switch once the migration is done, step by step."""
+    S = SITES[site]
+    o = S["o"]
+    me = DEVICES[idx]
+    suf = me[1]
+    dev = dict(hostname=host(site, suf), site=site, role=device_role(suf), asn=dev_asn(site, suf),
+               router_id=f"10.{o}.240.{me[2]}", interfaces=fabric_interfaces(site, idx), bgp=[])
+    for step, vrf, afi, ip, asn, name in bgp_sessions(site, idx):
+        legacy = name == "legacy core"
+        s = dict(step=step, vrf=vrf, afi=afi, neighbor=ip, remote_as=asn, peer=name,
+                 bfd=afi == "ipv4" and not legacy)
+        if legacy:
+            s["until"] = STEP["cleanup"]
+        dev["bgp"].append(s)
+    if suf.startswith("NXSP"):
+        return dev
+    l3 = dict(vni=TRUST["l3vni"], type="L3", vrf=TRUST["name"], vlan=TRUST["vlan"], rd="auto",
+              route_target=TRUST["rt"])
+    l2 = [dict(vni=S["vni"] + v, type="L2", vlan=v, rd="auto", route_target=f"{S['asn']}:{S['vni'] + v}")
+          for v, _ in site_host_vlans(site)] if suf.startswith("NXLF") else []
+    dev["vnis"] = [l3] + l2
+    dev["nve"] = dict(source_interface="loopback1", primary=f"10.{o}.241.{me[3]}")
+    if suf.startswith("NXLF"):
+        pair = me[6]
+        mate = DEVICES[idx + 1] if idx % 2 == 0 else DEVICES[idx - 1]
+        k = pair * 8
+        dev["nve"]["secondary"] = f"10.{o}.241.{me[4]}"
+        dev["vpc"] = dict(domain=S["vpc"][pair], peer=host(site, mate[1]),
+                          keepalive=f"10.{o}.243.{k + 2 if idx % 2 == 0 else k + 1}", peer_link="port-channel10")
+    else:
+        dev["multisite"] = dict(site_id=S["site_id"], vip=f"10.{o}.241.{BGW_VIP}",
+                                fabric_links=[uplink(i) for i in range(len(spines()))],
+                                dci_links=sorted(port for _, port, _, _, _, _ in bgw_dci(site, suf)))
+    return dev
+
+
+def expected_state():
+    return dict(
+        schema_version=EXPECTED_STATE_SCHEMA,
+        generator="network-design",
+        classification=DATA["doc"]["classification"],
+        dci_mode=DCI_MODE,
+        steps=[dict(id=r[0], title=r[1]) for r in DATA["doc"]["migration"]],
+        sites=[dict(code=s, octet=SITES[s]["o"], multisite_site_id=SITES[s]["site_id"],
+                    multisite_vip=f"10.{SITES[s]['o']}.241.{BGW_VIP}") for s in SITE_ORDER],
+        devices=[expected_device(s, i) for s in SITE_ORDER for i in range(len(DEVICES))])
+
+
+def write_expected_state(path):
+    path.write_text(json.dumps(expected_state(), indent=1) + "\n", encoding="utf-8")
+    return path
+
+
 def write_configs(outdir):
     outdir.mkdir(exist_ok=True)
     written = []
@@ -1745,6 +1841,7 @@ def main(argv=None):
     print("wrote", len(files), "files to", args.out / "configs")
     n = write_checks(args.out / "checks")
     print("wrote", n, "checks to", args.out / "checks")
+    print("wrote", write_expected_state(args.out / "expected-state.json"))
     write_diagrams(args.out / "diagrams")
     print("wrote", len(DCI_OPTIONS), "DCI option diagrams to", args.out / "diagrams")
     return 0

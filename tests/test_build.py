@@ -35,6 +35,7 @@ class DemoFabricTest(unittest.TestCase):
         self.assertTrue((self.out / "demo-fabric-design.html").is_file())
         self.assertEqual(len(list((self.out / "checks").glob("*.txt"))), 2 * len(build.DEVICES))
         self.assertTrue((self.out / "checks" / "checks.json").is_file())
+        self.assertTrue((self.out / "expected-state.json").is_file())
 
     def test_no_ospf_configured(self):
         for name, txt in self.configs.items():
