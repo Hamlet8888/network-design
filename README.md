@@ -78,7 +78,7 @@ The expectations come from the same model as the configs, and the tests check th
 
 `expected-state.json` is the design as data, for
 [network-automation-tools](https://github.com/Hamlet8888/network-automation-tools) to audit live switches
-against. For every switch it lists the role, ASN and router-ID, the routed fabric links with MTU and
+against. For every switch it lists the role, ASN, router-ID and mgmt0 address (where the auditor connects), the routed fabric links with MTU and
 address, every BGP session (VRF, address family, neighbor, remote AS, BFD, and the migration step that
 brings it up or, for the legacy core, removes it), the VNIs with their VLAN or VRF and route target, the
 NVE source addresses, the vPC domain and keepalive, and the Multi-Site site ID, VIP, fabric and DCI links.
