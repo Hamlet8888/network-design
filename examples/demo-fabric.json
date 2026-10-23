@@ -432,19 +432,19 @@
       [
         "M1",
         "Build each fabric",
-        "Underlay, EVPN, NVE, L3VNI. Host SVIs created shut.",
+        "Underlay, EVPN, NVE, L3VNI, vPC, management baseline; BGWs on the fabric side only. Host SVIs created shut.",
         "No production impact"
       ],
       [
         "M2",
         "Join legacy core",
-        "eBGP to the legacy core on VLAN 99 for the migration window.",
+        "Bring up Po30 and eBGP to the legacy core on VLAN 99 for the migration window.",
         "Low"
       ],
       [
         "M3",
         "Move hosts and gateways",
-        "Per VLAN: extend, move servers, then bring up the anycast SVI.",
+        "Per VLAN: extend, move servers, then shut the legacy gateway and bring up the anycast SVI.",
         "Per VLAN"
       ],
       [
@@ -456,8 +456,14 @@
       [
         "M5",
         "Multi-Site and cloud",
-        "Bring up the BGWs, DCI and cloud sessions.",
+        "Bring up the DCI circuits, the BGW DCI sessions and the cloud sessions.",
         "Changes inter-site paths"
+      ],
+      [
+        "M6",
+        "Retire the legacy core",
+        "Remove the migration block (Po30, VLAN 99 SVI, legacy BGP neighbor and route-maps) from LF-03/LF-04.",
+        "Low"
       ]
     ],
     "tests": [

@@ -497,6 +497,55 @@ class FabricConsistencyTest(unittest.TestCase):
                     lines = [x.line for x in af.children]
                     self.assertIn("send-community extended", lines, f"{c.name} {ip}")
 
+    # -- day-2 checks -----------------------------------------------------------
+    def device_index(self, c):
+        site, role = c.name.split("-", 1)
+        return site, self.roles().index(role)
+
+    def test_expected_bgp_sessions_match_the_configs(self):
+        """The day-2 checks expect exactly the BGP sessions each config defines, with the same AS."""
+        for c in self.cfg.values():
+            site, idx = self.device_index(c)
+            expected = {(vrf, ip, asn, afi) for _, vrf, afi, ip, asn, _ in build.bgp_sessions(site, idx)}
+            configured = set()
+            for vrf, ip, n in c.neighbors():
+                asn = int(n.values("remote-as")[0])
+                afis = {"evpn" if af.line == "address-family l2vpn evpn" else "ipv4" for af in n.find("address-family")}
+                for afi in afis:
+                    configured.add((vrf, ip, asn, afi))
+            self.assertEqual(expected, configured, c.name)
+
+    def test_expected_dci_links_vnis_and_vpc_match_the_configs(self):
+        for c in self.cfg.values():
+            site, idx = self.device_index(c)
+            checks = {cmd: exp for _, cmd, exp in build.device_checks(site, idx)}
+            _, l2, l3 = c.nve()
+            if "show nve multisite dci-links" in checks:
+                ports = sorted(i for i in c.interfaces if self.is_dci(c, i))
+                self.assertEqual(checks["show nve multisite dci-links"], "Up: " + ", ".join(ports), c.name)
+            if "show nve vni" in checks:
+                self.assertIn(f"L3VNI {l3.pop()}", checks["show nve vni"], c.name)
+                for vni in l2:
+                    self.assertIn(str(vni), checks["show nve vni"], c.name)
+            if "show vpc brief" in checks:
+                domain = c.top("vpc domain")[0].line.split()[-1]
+                self.assertTrue(checks["show vpc brief"].startswith(f"Domain {domain}:"), c.name)
+
+    def test_every_check_step_is_in_the_migration_table(self):
+        steps = [r[0] for r in self.data["doc"]["migration"]]
+        for c in self.cfg.values():
+            site, idx = self.device_index(c)
+            got = [st for st, _, _ in build.device_checks(site, idx)]
+            self.assertTrue(set(got) <= set(steps), c.name)
+            self.assertEqual(got, sorted(got, key=steps.index), f"{c.name}: checks out of step order")
+            self.assertIn(build.STEP["build"], got)
+
+    def test_config_step_references_exist(self):
+        steps = {r[0] for r in self.data["doc"]["migration"]}
+        for c in self.cfg.values():
+            for ref in re.findall(r"\b(M\d+)\b", c.text):
+                self.assertIn(ref, steps, f"{c.name} refers to {ref}")
+
     # -- management baseline --------------------------------------------------
     def test_baseline_is_on_every_switch(self):
         bl = self.data["baseline"]

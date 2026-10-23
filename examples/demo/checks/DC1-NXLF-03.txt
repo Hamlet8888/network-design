@@ -1,0 +1,46 @@
+# DC1-NXLF-03 · day-2 checks by migration step
+# FICTIONAL DEMO DATA: not for any real network.
+
+## M1 · Build each fabric
+DC1-NXLF-03# show bgp ipv4 unicast summary
+  expect: Established: 10.110.242.4 (AS 65210, DC1-NXSP-01), 10.110.242.36 (AS 65210, DC1-NXSP-02), 10.110.243.14 (AS 65214, DC1-NXLF-04)
+DC1-NXLF-03# show bgp l2vpn evpn summary
+  expect: Established: 10.110.240.1 (AS 65210, DC1-NXSP-01), 10.110.240.2 (AS 65210, DC1-NXSP-02)
+DC1-NXLF-03# show bfd neighbors
+  expect: Up: 10.110.242.4, 10.110.242.36, 10.110.243.14
+DC1-NXLF-03# show vpc brief
+  expect: Domain 112: peer adjacency formed ok, peer-keepalive alive (10.110.243.10, VRF KEEPALIVE), peer-link Po10 up, type-1 consistency success
+DC1-NXLF-03# show nve vni
+  expect: Up: L3VNI 50010 (VRF TRUST); L2VNIs 110010, 110020, 110030, 110040, 110100 (BGP, SA)
+DC1-NXLF-03# show nve interface nve1 detail
+  expect: Source loopback1 primary 10.110.241.13, secondary 10.110.241.102; advertise-pip and advertise virtual-rmac enabled
+DC1-NXLF-03# show ntp peer-status
+  expect: Synchronized (*) to one of 10.250.0.123, 10.250.1.123, VRF management
+DC1-NXLF-03# show tacacs-server
+  expect: Servers 10.250.0.49, 10.250.1.49; test login with a TACACS account
+
+## M2 · Join legacy core
+DC1-NXLF-03# show bgp vrf TRUST ipv4 unicast summary
+  expect: Established: <DC1-CORE-VLAN99-IP> (AS 65218, legacy core)
+DC1-NXLF-03# show ip route vrf TRUST 0.0.0.0/0
+  expect: Via the legacy core (AS 65218), local preference 50
+
+## M3 · Move hosts and gateways
+DC1-NXLF-03# show ip interface brief vrf TRUST
+  expect: Up/up as each VLAN is cut over: Vlan10 10.110.10.1, Vlan20 10.110.20.1, Vlan30 10.110.30.1, Vlan40 10.110.40.1, Vlan100 10.110.100.1
+DC1-NXLF-03# show fabric forwarding ip local-host-db vrf TRUST
+  expect: Hosts of the migrated VLANs on this pair are learned
+
+## M4 · Move the firewalls
+DC1-NXLF-03# show bgp vrf TRUST ipv4 unicast summary
+  expect: Established: 10.110.244.65 (AS 65217, DC1-FW-01/02); 1 prefix received
+DC1-NXLF-03# show ip route vrf TRUST 0.0.0.0/0
+  expect: Via 10.110.244.65 (eBGP), not the legacy core
+
+## M5 · Multi-Site and cloud
+DC1-NXLF-03# show ip route vrf TRUST 10.120.10.0/24
+  expect: Via 10.110.241.200 (local BGW Multi-Site VIP), encap VXLAN
+
+## M6 · Retire the legacy core
+DC1-NXLF-03# show bgp vrf TRUST ipv4 unicast summary
+  expect: No neighbor <DC1-CORE-VLAN99-IP>; migration block removed (Po30, Vlan99, RM-LEGACY-*)
