@@ -13,6 +13,7 @@ Standard library only (Python 3.9+).
 """
 import argparse
 import html
+import ipaddress
 import json
 import sys
 from pathlib import Path
@@ -33,9 +34,8 @@ AZURE_ASN = 12076
 def load(data):
     """Install a site data document (see examples/demo-fabric.json) as the design input."""
     global DATA, SITES, SITE_ORDER, ASN_PLAN, TRUST_VLANS, DMZ_VLANS, CLOUD_AWS, CLOUD_AZURE, AWS_ASN, AZURE_ASN
+    validate(data)
     sites = data["sites"]
-    if len(sites) != 2:
-        raise ValueError("the design covers exactly two sites")
     DATA = data
     SITE_ORDER = [x["code"] for x in sites]
     SITES = {}
@@ -53,6 +53,85 @@ def load(data):
     c = data["cloud"]
     CLOUD_AWS, CLOUD_AZURE = c["aws_prefixes"], c["azure_prefixes"]
     AWS_ASN, AZURE_ASN = c["aws_asn"], c["azure_asn"]
+
+
+def validate(data):
+    """Reject site data that would generate overlapping addresses, VNIs, ASNs or IDs.
+
+    The address plan puts host VLAN N at 10.<octet>.N.0/24 and all infrastructure in
+    10.<octet>.240.0/21, so a VLAN ID doubles as a third octet and must stay below 240.
+    """
+    errors = []
+    sites = data["sites"]
+    if len(sites) != 2:
+        raise ValueError("the design covers exactly two sites")
+
+    def distinct(label, values):
+        seen = set()
+        for v in values:
+            if v in seen:
+                errors.append(f"{label} {v!r} is used more than once")
+            seen.add(v)
+
+    distinct("site code", [x["code"] for x in sites])
+    distinct("site octet", [x["octet"] for x in sites])
+    distinct("Multi-Site site_id", [x["site_id"] for x in sites])
+    distinct("vPC domain", [d for x in sites for d in x["vpc_domains"]])
+    asns = [a for x in sites for a in x["asn"].values() if a != x["asn"]["spine"]]
+    asns += [x["asn"]["spine"] for x in sites] + [data["cloud"]["aws_asn"], data["cloud"]["azure_asn"]]
+    distinct("BGP AS", asns)
+
+    legacy = data["legacy"]["vlan"]
+    if not 2 <= legacy <= 239:
+        errors.append(f"legacy VLAN {legacy} must be 2-239 (it is also the third octet of 10.x.{legacy}.0/24)")
+    vnis = {TRUST["l3vni"]: f"L3VNI {TRUST['name']}"}
+    for x in sites:
+        site = x["code"]
+        if not 0 <= x["octet"] <= 255:
+            errors.append(f"{site}: octet {x['octet']} is not 0-255")
+        if len(x["vpc_domains"]) != 2:
+            errors.append(f"{site}: needs exactly two vpc_domains")
+        expected = {d[1] for d in DEVICES} | {"spine", "fw", "core"}
+        expected -= {d[1] for d in DEVICES if d[1].startswith("NXSP")}
+        if set(x["asn"]) != expected:
+            errors.append(f"{site}: asn keys must be {sorted(expected)}")
+        vids = [v for v, _ in x["host_vlans"]]
+        distinct(f"{site} host VLAN", vids)
+        for v, name in x["host_vlans"]:
+            if not 2 <= v <= 239:
+                errors.append(f"{site}: host VLAN {v} must be 2-239 (10.{x['octet']}.{v}.0/24; "
+                              f"10.{x['octet']}.240.0/21 is infrastructure)")
+            if v == legacy:
+                errors.append(f"{site}: host VLAN {v} is the legacy core transit VLAN")
+            if len(name) > 32:
+                errors.append(f"{site}: VLAN {v} name {name!r} is longer than 32 characters")
+            vni = x["vni_base"] + v
+            if vni in vnis:
+                errors.append(f"{site}: VLAN {v} gets VNI {vni}, already used by {vnis[vni]}")
+            vnis[vni] = f"{site} VLAN {v}"
+            if not 4096 <= vni <= 16777214:
+                errors.append(f"{site}: VLAN {v} gets VNI {vni}, outside 4096-16777214")
+        core_ip = x.get("legacy_core_ip")
+        if core_ip:
+            net = ipaddress.ip_network(f"10.{x['octet']}.{legacy}.0/24")
+            if ipaddress.ip_address(core_ip) not in net:
+                errors.append(f"{site}: legacy_core_ip {core_ip} is outside {net}")
+            elif int(core_ip.split(".")[3]) in (11, 12):
+                errors.append(f"{site}: legacy_core_ip {core_ip} collides with a border-leaf SVI (.11/.12)")
+
+    site_nets = {x["code"]: ipaddress.ip_network(f"10.{x['octet']}.0.0/16") for x in sites if 0 <= x["octet"] <= 255}
+    for kind in ("aws_prefixes", "azure_prefixes"):
+        for p in data["cloud"][kind]:
+            try:
+                net = ipaddress.ip_network(p)
+            except ValueError as exc:
+                errors.append(f"cloud {kind}: {exc}")
+                continue
+            for site, sn in site_nets.items():
+                if net.overlaps(sn):
+                    errors.append(f"cloud {kind}: {p} overlaps {site} {sn}")
+    if errors:
+        raise ValueError("invalid site data:\n  " + "\n  ".join(errors))
 
 
 def A():
@@ -1227,7 +1306,8 @@ def main(argv=None):
     try:
         load(json.loads(args.data.read_text(encoding="utf-8")))
     except (OSError, ValueError, KeyError) as exc:
-        print(f"fabric_design: cannot load {args.data}: {exc!r}", file=sys.stderr)
+        detail = exc if isinstance(exc, ValueError) else repr(exc)
+        print(f"fabric_design: cannot load {args.data}: {detail}", file=sys.stderr)
         return 2
     args.out.mkdir(parents=True, exist_ok=True)
     page = args.out / DATA["doc"].get("output_html", "design.html")

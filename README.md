@@ -35,7 +35,7 @@ No OSPF anywhere. All infrastructure addressing sits inside each site's own /16 
 | `fabric_design/build.py` | The generator: design rules, address plan, NX-OS and PAN-OS templates, workbook |
 | `examples/demo-fabric.json` | Fictional two-site input (DC1/DC2) |
 | `examples/demo/` | Workbook and configs generated from the demo input |
-| `tests/` | Consistency checks on generated output (BGP neighbor symmetry, link pairing, no OSPF) |
+| `tests/` | Input validation and cross-device consistency checks on generated output |
 | `private/` | **Git-ignored.** Real site data and everything generated from it |
 
 ## Your own sites
@@ -54,6 +54,29 @@ ports, cloud allowlists and the workbook narrative.
 ```bash
 python3 -m unittest discover -s tests -t .
 ```
+
+The build rejects site data that would produce a broken fabric, and lists every problem at once:
+host VLANs outside 2-239 (VLAN N is 10.x.N.0/24, and 10.x.240.0/21 is infrastructure), duplicate ASNs,
+octets, Multi-Site site IDs, vPC domains or VNIs, and cloud prefixes that overlap a site.
+
+The tests parse the generated NX-OS configs (`tests/nxos.py`) and check them across devices:
+
+- **Addressing:** every address is unique except the known anycast ones (gateway, vPC VTEP, BGW VIP),
+  no two subnets overlap, infrastructure stays in the /21, and both ends of every link agree on
+  description, port, /31 and MTU.
+- **BGP:** sessions are symmetric, router-ID is loopback0, `network` statements are local, multihop
+  sessions source from loopback0, single-hop sessions run BFD, and EVPN sessions send extended communities.
+- **VNIs and RTs:** VLAN, `vn-segment`, EVPN RT and NVE membership agree on every VTEP, the L3VNI and its RT
+  are identical fabric-wide, and BGWs carry no L2VNIs.
+- **vPC:** domains, keepalives, anycast VTEP, SVIs, gateway MAC and the backup underlay mirror across each pair.
+- **Multi-Site:** site IDs and VIPs, fabric/DCI tracking, `peer-type fabric-external` to every remote BGW,
+  only BGW loopbacks in the DCI underlay, no default route over the DCI.
+- **Policy:** every route-map, prefix-list and as-path list is defined where used, and a prefix-list name
+  means the same thing on every switch of a site.
+- **Firewall:** the PAN-OS peers, ASNs, transit subnets and ports match the border leafs.
+- **Demo output:** `examples/demo/` matches what the generator produces now.
+
+GitHub Actions runs the suite on Python 3.9 and 3.13 for every push and pull request.
 
 ## Data handling
 
