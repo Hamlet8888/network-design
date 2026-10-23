@@ -34,7 +34,7 @@ No OSPF anywhere. All infrastructure addressing sits inside each site's own /16 
 |---|---|
 | `fabric_design/build.py` | The generator: design rules, address plan, NX-OS and PAN-OS templates, workbook |
 | `examples/demo-fabric.json` | Fictional two-site input (DC1/DC2) |
-| `examples/demo/` | Workbook and configs generated from the demo input |
+| `examples/demo/` | Workbook, configs and day-2 checks generated from the demo input |
 | `tests/` | Input validation and cross-device consistency checks on generated output |
 | `private/` | **Git-ignored.** Real site data and everything generated from it |
 
@@ -48,6 +48,14 @@ python3 -m fabric_design.build private/<name>.json --out private/<name>
 
 The data file holds everything environment-specific: site codes and /16s, ASNs, VLANs, firewall names and
 ports, cloud allowlists and the workbook narrative.
+
+### Day-2 checks
+
+`checks/<switch>.txt` lists, for every switch and migration step (M1 build to M6 legacy retirement), the
+show commands to run and what they should return: BGP sessions by neighbor and AS, BFD, vPC, NVE VNIs,
+Multi-Site fabric/DCI links, the default route before and after the firewall move, remote-site and cloud
+routes. `checks/checks.json` carries the same list for automation, and section 13 of the workbook shows it.
+The expectations come from the same model as the configs, and the tests check that they agree.
 
 ### Management baseline
 

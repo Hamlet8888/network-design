@@ -1,0 +1,1130 @@
+[
+ {
+  "device": "DC1-NXSP-01",
+  "step": "M1",
+  "command": "show bgp ipv4 unicast summary",
+  "expect": "Established: 10.110.242.1 (AS 65211, DC1-NXLF-01), 10.110.242.3 (AS 65212, DC1-NXLF-02), 10.110.242.5 (AS 65213, DC1-NXLF-03), 10.110.242.7 (AS 65214, DC1-NXLF-04), 10.110.242.9 (AS 65215, DC1-NXBGW-01), 10.110.242.11 (AS 65216, DC1-NXBGW-02)"
+ },
+ {
+  "device": "DC1-NXSP-01",
+  "step": "M1",
+  "command": "show bgp l2vpn evpn summary",
+  "expect": "Established: 10.110.240.11 (AS 65211, DC1-NXLF-01), 10.110.240.12 (AS 65212, DC1-NXLF-02), 10.110.240.13 (AS 65213, DC1-NXLF-03), 10.110.240.14 (AS 65214, DC1-NXLF-04), 10.110.240.21 (AS 65215, DC1-NXBGW-01), 10.110.240.22 (AS 65216, DC1-NXBGW-02)"
+ },
+ {
+  "device": "DC1-NXSP-01",
+  "step": "M1",
+  "command": "show bfd neighbors",
+  "expect": "Up: 10.110.242.1, 10.110.242.3, 10.110.242.5, 10.110.242.7, 10.110.242.9, 10.110.242.11"
+ },
+ {
+  "device": "DC1-NXSP-01",
+  "step": "M1",
+  "command": "show ntp peer-status",
+  "expect": "Synchronized (*) to one of 10.250.0.123, 10.250.1.123, VRF management"
+ },
+ {
+  "device": "DC1-NXSP-01",
+  "step": "M1",
+  "command": "show tacacs-server",
+  "expect": "Servers 10.250.0.49, 10.250.1.49; test login with a TACACS account"
+ },
+ {
+  "device": "DC1-NXSP-02",
+  "step": "M1",
+  "command": "show bgp ipv4 unicast summary",
+  "expect": "Established: 10.110.242.33 (AS 65211, DC1-NXLF-01), 10.110.242.35 (AS 65212, DC1-NXLF-02), 10.110.242.37 (AS 65213, DC1-NXLF-03), 10.110.242.39 (AS 65214, DC1-NXLF-04), 10.110.242.41 (AS 65215, DC1-NXBGW-01), 10.110.242.43 (AS 65216, DC1-NXBGW-02)"
+ },
+ {
+  "device": "DC1-NXSP-02",
+  "step": "M1",
+  "command": "show bgp l2vpn evpn summary",
+  "expect": "Established: 10.110.240.11 (AS 65211, DC1-NXLF-01), 10.110.240.12 (AS 65212, DC1-NXLF-02), 10.110.240.13 (AS 65213, DC1-NXLF-03), 10.110.240.14 (AS 65214, DC1-NXLF-04), 10.110.240.21 (AS 65215, DC1-NXBGW-01), 10.110.240.22 (AS 65216, DC1-NXBGW-02)"
+ },
+ {
+  "device": "DC1-NXSP-02",
+  "step": "M1",
+  "command": "show bfd neighbors",
+  "expect": "Up: 10.110.242.33, 10.110.242.35, 10.110.242.37, 10.110.242.39, 10.110.242.41, 10.110.242.43"
+ },
+ {
+  "device": "DC1-NXSP-02",
+  "step": "M1",
+  "command": "show ntp peer-status",
+  "expect": "Synchronized (*) to one of 10.250.0.123, 10.250.1.123, VRF management"
+ },
+ {
+  "device": "DC1-NXSP-02",
+  "step": "M1",
+  "command": "show tacacs-server",
+  "expect": "Servers 10.250.0.49, 10.250.1.49; test login with a TACACS account"
+ },
+ {
+  "device": "DC1-NXLF-01",
+  "step": "M1",
+  "command": "show bgp ipv4 unicast summary",
+  "expect": "Established: 10.110.242.0 (AS 65210, DC1-NXSP-01), 10.110.242.32 (AS 65210, DC1-NXSP-02), 10.110.243.6 (AS 65212, DC1-NXLF-02)"
+ },
+ {
+  "device": "DC1-NXLF-01",
+  "step": "M1",
+  "command": "show bgp l2vpn evpn summary",
+  "expect": "Established: 10.110.240.1 (AS 65210, DC1-NXSP-01), 10.110.240.2 (AS 65210, DC1-NXSP-02)"
+ },
+ {
+  "device": "DC1-NXLF-01",
+  "step": "M1",
+  "command": "show bfd neighbors",
+  "expect": "Up: 10.110.242.0, 10.110.242.32, 10.110.243.6"
+ },
+ {
+  "device": "DC1-NXLF-01",
+  "step": "M1",
+  "command": "show vpc brief",
+  "expect": "Domain 111: peer adjacency formed ok, peer-keepalive alive (10.110.243.2, VRF KEEPALIVE), peer-link Po10 up, type-1 consistency success"
+ },
+ {
+  "device": "DC1-NXLF-01",
+  "step": "M1",
+  "command": "show nve vni",
+  "expect": "Up: L3VNI 50010 (VRF TRUST); L2VNIs 110010, 110020, 110030, 110040, 110100 (BGP, SA)"
+ },
+ {
+  "device": "DC1-NXLF-01",
+  "step": "M1",
+  "command": "show nve interface nve1 detail",
+  "expect": "Source loopback1 primary 10.110.241.11, secondary 10.110.241.101; advertise-pip and advertise virtual-rmac enabled"
+ },
+ {
+  "device": "DC1-NXLF-01",
+  "step": "M1",
+  "command": "show ntp peer-status",
+  "expect": "Synchronized (*) to one of 10.250.0.123, 10.250.1.123, VRF management"
+ },
+ {
+  "device": "DC1-NXLF-01",
+  "step": "M1",
+  "command": "show tacacs-server",
+  "expect": "Servers 10.250.0.49, 10.250.1.49; test login with a TACACS account"
+ },
+ {
+  "device": "DC1-NXLF-01",
+  "step": "M3",
+  "command": "show ip interface brief vrf TRUST",
+  "expect": "Up/up as each VLAN is cut over: Vlan10 10.110.10.1, Vlan20 10.110.20.1, Vlan30 10.110.30.1, Vlan40 10.110.40.1, Vlan100 10.110.100.1"
+ },
+ {
+  "device": "DC1-NXLF-01",
+  "step": "M3",
+  "command": "show fabric forwarding ip local-host-db vrf TRUST",
+  "expect": "Hosts of the migrated VLANs on this pair are learned"
+ },
+ {
+  "device": "DC1-NXLF-01",
+  "step": "M4",
+  "command": "show ip route vrf TRUST 0.0.0.0/0",
+  "expect": "Via 10.110.241.13 and 10.110.241.14 (LF-03/LF-04 PIPs), encap VXLAN"
+ },
+ {
+  "device": "DC1-NXLF-01",
+  "step": "M5",
+  "command": "show ip route vrf TRUST 10.120.10.0/24",
+  "expect": "Via 10.110.241.200 (local BGW Multi-Site VIP), encap VXLAN"
+ },
+ {
+  "device": "DC1-NXLF-02",
+  "step": "M1",
+  "command": "show bgp ipv4 unicast summary",
+  "expect": "Established: 10.110.242.2 (AS 65210, DC1-NXSP-01), 10.110.242.34 (AS 65210, DC1-NXSP-02), 10.110.243.5 (AS 65211, DC1-NXLF-01)"
+ },
+ {
+  "device": "DC1-NXLF-02",
+  "step": "M1",
+  "command": "show bgp l2vpn evpn summary",
+  "expect": "Established: 10.110.240.1 (AS 65210, DC1-NXSP-01), 10.110.240.2 (AS 65210, DC1-NXSP-02)"
+ },
+ {
+  "device": "DC1-NXLF-02",
+  "step": "M1",
+  "command": "show bfd neighbors",
+  "expect": "Up: 10.110.242.2, 10.110.242.34, 10.110.243.5"
+ },
+ {
+  "device": "DC1-NXLF-02",
+  "step": "M1",
+  "command": "show vpc brief",
+  "expect": "Domain 111: peer adjacency formed ok, peer-keepalive alive (10.110.243.1, VRF KEEPALIVE), peer-link Po10 up, type-1 consistency success"
+ },
+ {
+  "device": "DC1-NXLF-02",
+  "step": "M1",
+  "command": "show nve vni",
+  "expect": "Up: L3VNI 50010 (VRF TRUST); L2VNIs 110010, 110020, 110030, 110040, 110100 (BGP, SA)"
+ },
+ {
+  "device": "DC1-NXLF-02",
+  "step": "M1",
+  "command": "show nve interface nve1 detail",
+  "expect": "Source loopback1 primary 10.110.241.12, secondary 10.110.241.101; advertise-pip and advertise virtual-rmac enabled"
+ },
+ {
+  "device": "DC1-NXLF-02",
+  "step": "M1",
+  "command": "show ntp peer-status",
+  "expect": "Synchronized (*) to one of 10.250.0.123, 10.250.1.123, VRF management"
+ },
+ {
+  "device": "DC1-NXLF-02",
+  "step": "M1",
+  "command": "show tacacs-server",
+  "expect": "Servers 10.250.0.49, 10.250.1.49; test login with a TACACS account"
+ },
+ {
+  "device": "DC1-NXLF-02",
+  "step": "M3",
+  "command": "show ip interface brief vrf TRUST",
+  "expect": "Up/up as each VLAN is cut over: Vlan10 10.110.10.1, Vlan20 10.110.20.1, Vlan30 10.110.30.1, Vlan40 10.110.40.1, Vlan100 10.110.100.1"
+ },
+ {
+  "device": "DC1-NXLF-02",
+  "step": "M3",
+  "command": "show fabric forwarding ip local-host-db vrf TRUST",
+  "expect": "Hosts of the migrated VLANs on this pair are learned"
+ },
+ {
+  "device": "DC1-NXLF-02",
+  "step": "M4",
+  "command": "show ip route vrf TRUST 0.0.0.0/0",
+  "expect": "Via 10.110.241.13 and 10.110.241.14 (LF-03/LF-04 PIPs), encap VXLAN"
+ },
+ {
+  "device": "DC1-NXLF-02",
+  "step": "M5",
+  "command": "show ip route vrf TRUST 10.120.10.0/24",
+  "expect": "Via 10.110.241.200 (local BGW Multi-Site VIP), encap VXLAN"
+ },
+ {
+  "device": "DC1-NXLF-03",
+  "step": "M1",
+  "command": "show bgp ipv4 unicast summary",
+  "expect": "Established: 10.110.242.4 (AS 65210, DC1-NXSP-01), 10.110.242.36 (AS 65210, DC1-NXSP-02), 10.110.243.14 (AS 65214, DC1-NXLF-04)"
+ },
+ {
+  "device": "DC1-NXLF-03",
+  "step": "M1",
+  "command": "show bgp l2vpn evpn summary",
+  "expect": "Established: 10.110.240.1 (AS 65210, DC1-NXSP-01), 10.110.240.2 (AS 65210, DC1-NXSP-02)"
+ },
+ {
+  "device": "DC1-NXLF-03",
+  "step": "M1",
+  "command": "show bfd neighbors",
+  "expect": "Up: 10.110.242.4, 10.110.242.36, 10.110.243.14"
+ },
+ {
+  "device": "DC1-NXLF-03",
+  "step": "M1",
+  "command": "show vpc brief",
+  "expect": "Domain 112: peer adjacency formed ok, peer-keepalive alive (10.110.243.10, VRF KEEPALIVE), peer-link Po10 up, type-1 consistency success"
+ },
+ {
+  "device": "DC1-NXLF-03",
+  "step": "M1",
+  "command": "show nve vni",
+  "expect": "Up: L3VNI 50010 (VRF TRUST); L2VNIs 110010, 110020, 110030, 110040, 110100 (BGP, SA)"
+ },
+ {
+  "device": "DC1-NXLF-03",
+  "step": "M1",
+  "command": "show nve interface nve1 detail",
+  "expect": "Source loopback1 primary 10.110.241.13, secondary 10.110.241.102; advertise-pip and advertise virtual-rmac enabled"
+ },
+ {
+  "device": "DC1-NXLF-03",
+  "step": "M1",
+  "command": "show ntp peer-status",
+  "expect": "Synchronized (*) to one of 10.250.0.123, 10.250.1.123, VRF management"
+ },
+ {
+  "device": "DC1-NXLF-03",
+  "step": "M1",
+  "command": "show tacacs-server",
+  "expect": "Servers 10.250.0.49, 10.250.1.49; test login with a TACACS account"
+ },
+ {
+  "device": "DC1-NXLF-03",
+  "step": "M2",
+  "command": "show bgp vrf TRUST ipv4 unicast summary",
+  "expect": "Established: <DC1-CORE-VLAN99-IP> (AS 65218, legacy core)"
+ },
+ {
+  "device": "DC1-NXLF-03",
+  "step": "M2",
+  "command": "show ip route vrf TRUST 0.0.0.0/0",
+  "expect": "Via the legacy core (AS 65218), local preference 50"
+ },
+ {
+  "device": "DC1-NXLF-03",
+  "step": "M3",
+  "command": "show ip interface brief vrf TRUST",
+  "expect": "Up/up as each VLAN is cut over: Vlan10 10.110.10.1, Vlan20 10.110.20.1, Vlan30 10.110.30.1, Vlan40 10.110.40.1, Vlan100 10.110.100.1"
+ },
+ {
+  "device": "DC1-NXLF-03",
+  "step": "M3",
+  "command": "show fabric forwarding ip local-host-db vrf TRUST",
+  "expect": "Hosts of the migrated VLANs on this pair are learned"
+ },
+ {
+  "device": "DC1-NXLF-03",
+  "step": "M4",
+  "command": "show bgp vrf TRUST ipv4 unicast summary",
+  "expect": "Established: 10.110.244.65 (AS 65217, DC1-FW-01/02); 1 prefix received"
+ },
+ {
+  "device": "DC1-NXLF-03",
+  "step": "M4",
+  "command": "show ip route vrf TRUST 0.0.0.0/0",
+  "expect": "Via 10.110.244.65 (eBGP), not the legacy core"
+ },
+ {
+  "device": "DC1-NXLF-03",
+  "step": "M5",
+  "command": "show ip route vrf TRUST 10.120.10.0/24",
+  "expect": "Via 10.110.241.200 (local BGW Multi-Site VIP), encap VXLAN"
+ },
+ {
+  "device": "DC1-NXLF-03",
+  "step": "M6",
+  "command": "show bgp vrf TRUST ipv4 unicast summary",
+  "expect": "No neighbor <DC1-CORE-VLAN99-IP>; migration block removed (Po30, Vlan99, RM-LEGACY-*)"
+ },
+ {
+  "device": "DC1-NXLF-04",
+  "step": "M1",
+  "command": "show bgp ipv4 unicast summary",
+  "expect": "Established: 10.110.242.6 (AS 65210, DC1-NXSP-01), 10.110.242.38 (AS 65210, DC1-NXSP-02), 10.110.243.13 (AS 65213, DC1-NXLF-03)"
+ },
+ {
+  "device": "DC1-NXLF-04",
+  "step": "M1",
+  "command": "show bgp l2vpn evpn summary",
+  "expect": "Established: 10.110.240.1 (AS 65210, DC1-NXSP-01), 10.110.240.2 (AS 65210, DC1-NXSP-02)"
+ },
+ {
+  "device": "DC1-NXLF-04",
+  "step": "M1",
+  "command": "show bfd neighbors",
+  "expect": "Up: 10.110.242.6, 10.110.242.38, 10.110.243.13"
+ },
+ {
+  "device": "DC1-NXLF-04",
+  "step": "M1",
+  "command": "show vpc brief",
+  "expect": "Domain 112: peer adjacency formed ok, peer-keepalive alive (10.110.243.9, VRF KEEPALIVE), peer-link Po10 up, type-1 consistency success"
+ },
+ {
+  "device": "DC1-NXLF-04",
+  "step": "M1",
+  "command": "show nve vni",
+  "expect": "Up: L3VNI 50010 (VRF TRUST); L2VNIs 110010, 110020, 110030, 110040, 110100 (BGP, SA)"
+ },
+ {
+  "device": "DC1-NXLF-04",
+  "step": "M1",
+  "command": "show nve interface nve1 detail",
+  "expect": "Source loopback1 primary 10.110.241.14, secondary 10.110.241.102; advertise-pip and advertise virtual-rmac enabled"
+ },
+ {
+  "device": "DC1-NXLF-04",
+  "step": "M1",
+  "command": "show ntp peer-status",
+  "expect": "Synchronized (*) to one of 10.250.0.123, 10.250.1.123, VRF management"
+ },
+ {
+  "device": "DC1-NXLF-04",
+  "step": "M1",
+  "command": "show tacacs-server",
+  "expect": "Servers 10.250.0.49, 10.250.1.49; test login with a TACACS account"
+ },
+ {
+  "device": "DC1-NXLF-04",
+  "step": "M2",
+  "command": "show bgp vrf TRUST ipv4 unicast summary",
+  "expect": "Established: <DC1-CORE-VLAN99-IP> (AS 65218, legacy core)"
+ },
+ {
+  "device": "DC1-NXLF-04",
+  "step": "M2",
+  "command": "show ip route vrf TRUST 0.0.0.0/0",
+  "expect": "Via the legacy core (AS 65218), local preference 50"
+ },
+ {
+  "device": "DC1-NXLF-04",
+  "step": "M3",
+  "command": "show ip interface brief vrf TRUST",
+  "expect": "Up/up as each VLAN is cut over: Vlan10 10.110.10.1, Vlan20 10.110.20.1, Vlan30 10.110.30.1, Vlan40 10.110.40.1, Vlan100 10.110.100.1"
+ },
+ {
+  "device": "DC1-NXLF-04",
+  "step": "M3",
+  "command": "show fabric forwarding ip local-host-db vrf TRUST",
+  "expect": "Hosts of the migrated VLANs on this pair are learned"
+ },
+ {
+  "device": "DC1-NXLF-04",
+  "step": "M4",
+  "command": "show bgp vrf TRUST ipv4 unicast summary",
+  "expect": "Established: 10.110.244.73 (AS 65217, DC1-FW-01/02); 1 prefix received"
+ },
+ {
+  "device": "DC1-NXLF-04",
+  "step": "M4",
+  "command": "show ip route vrf TRUST 0.0.0.0/0",
+  "expect": "Via 10.110.244.73 (eBGP), not the legacy core"
+ },
+ {
+  "device": "DC1-NXLF-04",
+  "step": "M5",
+  "command": "show ip route vrf TRUST 10.120.10.0/24",
+  "expect": "Via 10.110.241.200 (local BGW Multi-Site VIP), encap VXLAN"
+ },
+ {
+  "device": "DC1-NXLF-04",
+  "step": "M6",
+  "command": "show bgp vrf TRUST ipv4 unicast summary",
+  "expect": "No neighbor <DC1-CORE-VLAN99-IP>; migration block removed (Po30, Vlan99, RM-LEGACY-*)"
+ },
+ {
+  "device": "DC1-NXBGW-01",
+  "step": "M1",
+  "command": "show bgp ipv4 unicast summary",
+  "expect": "Established: 10.110.242.8 (AS 65210, DC1-NXSP-01), 10.110.242.40 (AS 65210, DC1-NXSP-02)"
+ },
+ {
+  "device": "DC1-NXBGW-01",
+  "step": "M1",
+  "command": "show bgp l2vpn evpn summary",
+  "expect": "Established: 10.110.240.1 (AS 65210, DC1-NXSP-01), 10.110.240.2 (AS 65210, DC1-NXSP-02)"
+ },
+ {
+  "device": "DC1-NXBGW-01",
+  "step": "M1",
+  "command": "show bfd neighbors",
+  "expect": "Up: 10.110.242.8, 10.110.242.40"
+ },
+ {
+  "device": "DC1-NXBGW-01",
+  "step": "M1",
+  "command": "show nve multisite fabric-links",
+  "expect": "Up: Ethernet1/49, Ethernet1/50"
+ },
+ {
+  "device": "DC1-NXBGW-01",
+  "step": "M1",
+  "command": "show nve vni",
+  "expect": "Up: L3VNI 50010 (VRF TRUST); no L2VNIs"
+ },
+ {
+  "device": "DC1-NXBGW-01",
+  "step": "M1",
+  "command": "show ntp peer-status",
+  "expect": "Synchronized (*) to one of 10.250.0.123, 10.250.1.123, VRF management"
+ },
+ {
+  "device": "DC1-NXBGW-01",
+  "step": "M1",
+  "command": "show tacacs-server",
+  "expect": "Servers 10.250.0.49, 10.250.1.49; test login with a TACACS account"
+ },
+ {
+  "device": "DC1-NXBGW-01",
+  "step": "M5",
+  "command": "show nve multisite dci-links",
+  "expect": "Up: Ethernet1/51, Ethernet1/52"
+ },
+ {
+  "device": "DC1-NXBGW-01",
+  "step": "M5",
+  "command": "show bgp ipv4 unicast summary",
+  "expect": "Established: 10.110.242.8 (AS 65210, DC1-NXSP-01), 10.110.242.40 (AS 65210, DC1-NXSP-02), 10.110.246.1 (AS 65225, DC2-NXBGW-01), 10.120.246.0 (AS 65226, DC2-NXBGW-02)"
+ },
+ {
+  "device": "DC1-NXBGW-01",
+  "step": "M5",
+  "command": "show bgp l2vpn evpn summary",
+  "expect": "Established: 10.110.240.1 (AS 65210, DC1-NXSP-01), 10.110.240.2 (AS 65210, DC1-NXSP-02), 10.120.240.21 (AS 65225, DC2-NXBGW-01), 10.120.240.22 (AS 65226, DC2-NXBGW-02)"
+ },
+ {
+  "device": "DC1-NXBGW-01",
+  "step": "M5",
+  "command": "show bgp vrf TRUST ipv4 unicast summary",
+  "expect": "Established: 10.110.244.2 (AS 64512, AWS Direct Connect), 10.110.244.18 (AS 12076, Azure ExpressRoute)"
+ },
+ {
+  "device": "DC1-NXBGW-01",
+  "step": "M5",
+  "command": "show nve peers",
+  "expect": "Includes 10.120.241.200 (the DC2 Multi-Site VIP), Up"
+ },
+ {
+  "device": "DC1-NXBGW-01",
+  "step": "M5",
+  "command": "show ip route vrf TRUST 10.200.0.0/16",
+  "expect": "Via 10.110.244.2 (AWS, AS 64512)"
+ },
+ {
+  "device": "DC1-NXBGW-01",
+  "step": "M5",
+  "command": "show ip route vrf TRUST 10.210.0.0/16",
+  "expect": "Via 10.110.244.18 (Azure, AS 12076)"
+ },
+ {
+  "device": "DC1-NXBGW-02",
+  "step": "M1",
+  "command": "show bgp ipv4 unicast summary",
+  "expect": "Established: 10.110.242.10 (AS 65210, DC1-NXSP-01), 10.110.242.42 (AS 65210, DC1-NXSP-02)"
+ },
+ {
+  "device": "DC1-NXBGW-02",
+  "step": "M1",
+  "command": "show bgp l2vpn evpn summary",
+  "expect": "Established: 10.110.240.1 (AS 65210, DC1-NXSP-01), 10.110.240.2 (AS 65210, DC1-NXSP-02)"
+ },
+ {
+  "device": "DC1-NXBGW-02",
+  "step": "M1",
+  "command": "show bfd neighbors",
+  "expect": "Up: 10.110.242.10, 10.110.242.42"
+ },
+ {
+  "device": "DC1-NXBGW-02",
+  "step": "M1",
+  "command": "show nve multisite fabric-links",
+  "expect": "Up: Ethernet1/49, Ethernet1/50"
+ },
+ {
+  "device": "DC1-NXBGW-02",
+  "step": "M1",
+  "command": "show nve vni",
+  "expect": "Up: L3VNI 50010 (VRF TRUST); no L2VNIs"
+ },
+ {
+  "device": "DC1-NXBGW-02",
+  "step": "M1",
+  "command": "show ntp peer-status",
+  "expect": "Synchronized (*) to one of 10.250.0.123, 10.250.1.123, VRF management"
+ },
+ {
+  "device": "DC1-NXBGW-02",
+  "step": "M1",
+  "command": "show tacacs-server",
+  "expect": "Servers 10.250.0.49, 10.250.1.49; test login with a TACACS account"
+ },
+ {
+  "device": "DC1-NXBGW-02",
+  "step": "M5",
+  "command": "show nve multisite dci-links",
+  "expect": "Up: Ethernet1/51, Ethernet1/52"
+ },
+ {
+  "device": "DC1-NXBGW-02",
+  "step": "M5",
+  "command": "show bgp ipv4 unicast summary",
+  "expect": "Established: 10.110.242.10 (AS 65210, DC1-NXSP-01), 10.110.242.42 (AS 65210, DC1-NXSP-02), 10.110.246.3 (AS 65226, DC2-NXBGW-02), 10.120.246.2 (AS 65225, DC2-NXBGW-01)"
+ },
+ {
+  "device": "DC1-NXBGW-02",
+  "step": "M5",
+  "command": "show bgp l2vpn evpn summary",
+  "expect": "Established: 10.110.240.1 (AS 65210, DC1-NXSP-01), 10.110.240.2 (AS 65210, DC1-NXSP-02), 10.120.240.21 (AS 65225, DC2-NXBGW-01), 10.120.240.22 (AS 65226, DC2-NXBGW-02)"
+ },
+ {
+  "device": "DC1-NXBGW-02",
+  "step": "M5",
+  "command": "show bgp vrf TRUST ipv4 unicast summary",
+  "expect": "Established: 10.110.244.10 (AS 64512, AWS Direct Connect), 10.110.244.22 (AS 12076, Azure ExpressRoute)"
+ },
+ {
+  "device": "DC1-NXBGW-02",
+  "step": "M5",
+  "command": "show nve peers",
+  "expect": "Includes 10.120.241.200 (the DC2 Multi-Site VIP), Up"
+ },
+ {
+  "device": "DC1-NXBGW-02",
+  "step": "M5",
+  "command": "show ip route vrf TRUST 10.200.0.0/16",
+  "expect": "Via 10.110.244.10 (AWS, AS 64512)"
+ },
+ {
+  "device": "DC1-NXBGW-02",
+  "step": "M5",
+  "command": "show ip route vrf TRUST 10.210.0.0/16",
+  "expect": "Via 10.110.244.22 (Azure, AS 12076)"
+ },
+ {
+  "device": "DC2-NXSP-01",
+  "step": "M1",
+  "command": "show bgp ipv4 unicast summary",
+  "expect": "Established: 10.120.242.1 (AS 65221, DC2-NXLF-01), 10.120.242.3 (AS 65222, DC2-NXLF-02), 10.120.242.5 (AS 65223, DC2-NXLF-03), 10.120.242.7 (AS 65224, DC2-NXLF-04), 10.120.242.9 (AS 65225, DC2-NXBGW-01), 10.120.242.11 (AS 65226, DC2-NXBGW-02)"
+ },
+ {
+  "device": "DC2-NXSP-01",
+  "step": "M1",
+  "command": "show bgp l2vpn evpn summary",
+  "expect": "Established: 10.120.240.11 (AS 65221, DC2-NXLF-01), 10.120.240.12 (AS 65222, DC2-NXLF-02), 10.120.240.13 (AS 65223, DC2-NXLF-03), 10.120.240.14 (AS 65224, DC2-NXLF-04), 10.120.240.21 (AS 65225, DC2-NXBGW-01), 10.120.240.22 (AS 65226, DC2-NXBGW-02)"
+ },
+ {
+  "device": "DC2-NXSP-01",
+  "step": "M1",
+  "command": "show bfd neighbors",
+  "expect": "Up: 10.120.242.1, 10.120.242.3, 10.120.242.5, 10.120.242.7, 10.120.242.9, 10.120.242.11"
+ },
+ {
+  "device": "DC2-NXSP-01",
+  "step": "M1",
+  "command": "show ntp peer-status",
+  "expect": "Synchronized (*) to one of 10.250.0.123, 10.250.1.123, VRF management"
+ },
+ {
+  "device": "DC2-NXSP-01",
+  "step": "M1",
+  "command": "show tacacs-server",
+  "expect": "Servers 10.250.0.49, 10.250.1.49; test login with a TACACS account"
+ },
+ {
+  "device": "DC2-NXSP-02",
+  "step": "M1",
+  "command": "show bgp ipv4 unicast summary",
+  "expect": "Established: 10.120.242.33 (AS 65221, DC2-NXLF-01), 10.120.242.35 (AS 65222, DC2-NXLF-02), 10.120.242.37 (AS 65223, DC2-NXLF-03), 10.120.242.39 (AS 65224, DC2-NXLF-04), 10.120.242.41 (AS 65225, DC2-NXBGW-01), 10.120.242.43 (AS 65226, DC2-NXBGW-02)"
+ },
+ {
+  "device": "DC2-NXSP-02",
+  "step": "M1",
+  "command": "show bgp l2vpn evpn summary",
+  "expect": "Established: 10.120.240.11 (AS 65221, DC2-NXLF-01), 10.120.240.12 (AS 65222, DC2-NXLF-02), 10.120.240.13 (AS 65223, DC2-NXLF-03), 10.120.240.14 (AS 65224, DC2-NXLF-04), 10.120.240.21 (AS 65225, DC2-NXBGW-01), 10.120.240.22 (AS 65226, DC2-NXBGW-02)"
+ },
+ {
+  "device": "DC2-NXSP-02",
+  "step": "M1",
+  "command": "show bfd neighbors",
+  "expect": "Up: 10.120.242.33, 10.120.242.35, 10.120.242.37, 10.120.242.39, 10.120.242.41, 10.120.242.43"
+ },
+ {
+  "device": "DC2-NXSP-02",
+  "step": "M1",
+  "command": "show ntp peer-status",
+  "expect": "Synchronized (*) to one of 10.250.0.123, 10.250.1.123, VRF management"
+ },
+ {
+  "device": "DC2-NXSP-02",
+  "step": "M1",
+  "command": "show tacacs-server",
+  "expect": "Servers 10.250.0.49, 10.250.1.49; test login with a TACACS account"
+ },
+ {
+  "device": "DC2-NXLF-01",
+  "step": "M1",
+  "command": "show bgp ipv4 unicast summary",
+  "expect": "Established: 10.120.242.0 (AS 65220, DC2-NXSP-01), 10.120.242.32 (AS 65220, DC2-NXSP-02), 10.120.243.6 (AS 65222, DC2-NXLF-02)"
+ },
+ {
+  "device": "DC2-NXLF-01",
+  "step": "M1",
+  "command": "show bgp l2vpn evpn summary",
+  "expect": "Established: 10.120.240.1 (AS 65220, DC2-NXSP-01), 10.120.240.2 (AS 65220, DC2-NXSP-02)"
+ },
+ {
+  "device": "DC2-NXLF-01",
+  "step": "M1",
+  "command": "show bfd neighbors",
+  "expect": "Up: 10.120.242.0, 10.120.242.32, 10.120.243.6"
+ },
+ {
+  "device": "DC2-NXLF-01",
+  "step": "M1",
+  "command": "show vpc brief",
+  "expect": "Domain 121: peer adjacency formed ok, peer-keepalive alive (10.120.243.2, VRF KEEPALIVE), peer-link Po10 up, type-1 consistency success"
+ },
+ {
+  "device": "DC2-NXLF-01",
+  "step": "M1",
+  "command": "show nve vni",
+  "expect": "Up: L3VNI 50010 (VRF TRUST); L2VNIs 120010, 120020, 120030, 120040, 120100 (BGP, SA)"
+ },
+ {
+  "device": "DC2-NXLF-01",
+  "step": "M1",
+  "command": "show nve interface nve1 detail",
+  "expect": "Source loopback1 primary 10.120.241.11, secondary 10.120.241.101; advertise-pip and advertise virtual-rmac enabled"
+ },
+ {
+  "device": "DC2-NXLF-01",
+  "step": "M1",
+  "command": "show ntp peer-status",
+  "expect": "Synchronized (*) to one of 10.250.0.123, 10.250.1.123, VRF management"
+ },
+ {
+  "device": "DC2-NXLF-01",
+  "step": "M1",
+  "command": "show tacacs-server",
+  "expect": "Servers 10.250.0.49, 10.250.1.49; test login with a TACACS account"
+ },
+ {
+  "device": "DC2-NXLF-01",
+  "step": "M3",
+  "command": "show ip interface brief vrf TRUST",
+  "expect": "Up/up as each VLAN is cut over: Vlan10 10.120.10.1, Vlan20 10.120.20.1, Vlan30 10.120.30.1, Vlan40 10.120.40.1, Vlan100 10.120.100.1"
+ },
+ {
+  "device": "DC2-NXLF-01",
+  "step": "M3",
+  "command": "show fabric forwarding ip local-host-db vrf TRUST",
+  "expect": "Hosts of the migrated VLANs on this pair are learned"
+ },
+ {
+  "device": "DC2-NXLF-01",
+  "step": "M4",
+  "command": "show ip route vrf TRUST 0.0.0.0/0",
+  "expect": "Via 10.120.241.13 and 10.120.241.14 (LF-03/LF-04 PIPs), encap VXLAN"
+ },
+ {
+  "device": "DC2-NXLF-01",
+  "step": "M5",
+  "command": "show ip route vrf TRUST 10.110.10.0/24",
+  "expect": "Via 10.120.241.200 (local BGW Multi-Site VIP), encap VXLAN"
+ },
+ {
+  "device": "DC2-NXLF-02",
+  "step": "M1",
+  "command": "show bgp ipv4 unicast summary",
+  "expect": "Established: 10.120.242.2 (AS 65220, DC2-NXSP-01), 10.120.242.34 (AS 65220, DC2-NXSP-02), 10.120.243.5 (AS 65221, DC2-NXLF-01)"
+ },
+ {
+  "device": "DC2-NXLF-02",
+  "step": "M1",
+  "command": "show bgp l2vpn evpn summary",
+  "expect": "Established: 10.120.240.1 (AS 65220, DC2-NXSP-01), 10.120.240.2 (AS 65220, DC2-NXSP-02)"
+ },
+ {
+  "device": "DC2-NXLF-02",
+  "step": "M1",
+  "command": "show bfd neighbors",
+  "expect": "Up: 10.120.242.2, 10.120.242.34, 10.120.243.5"
+ },
+ {
+  "device": "DC2-NXLF-02",
+  "step": "M1",
+  "command": "show vpc brief",
+  "expect": "Domain 121: peer adjacency formed ok, peer-keepalive alive (10.120.243.1, VRF KEEPALIVE), peer-link Po10 up, type-1 consistency success"
+ },
+ {
+  "device": "DC2-NXLF-02",
+  "step": "M1",
+  "command": "show nve vni",
+  "expect": "Up: L3VNI 50010 (VRF TRUST); L2VNIs 120010, 120020, 120030, 120040, 120100 (BGP, SA)"
+ },
+ {
+  "device": "DC2-NXLF-02",
+  "step": "M1",
+  "command": "show nve interface nve1 detail",
+  "expect": "Source loopback1 primary 10.120.241.12, secondary 10.120.241.101; advertise-pip and advertise virtual-rmac enabled"
+ },
+ {
+  "device": "DC2-NXLF-02",
+  "step": "M1",
+  "command": "show ntp peer-status",
+  "expect": "Synchronized (*) to one of 10.250.0.123, 10.250.1.123, VRF management"
+ },
+ {
+  "device": "DC2-NXLF-02",
+  "step": "M1",
+  "command": "show tacacs-server",
+  "expect": "Servers 10.250.0.49, 10.250.1.49; test login with a TACACS account"
+ },
+ {
+  "device": "DC2-NXLF-02",
+  "step": "M3",
+  "command": "show ip interface brief vrf TRUST",
+  "expect": "Up/up as each VLAN is cut over: Vlan10 10.120.10.1, Vlan20 10.120.20.1, Vlan30 10.120.30.1, Vlan40 10.120.40.1, Vlan100 10.120.100.1"
+ },
+ {
+  "device": "DC2-NXLF-02",
+  "step": "M3",
+  "command": "show fabric forwarding ip local-host-db vrf TRUST",
+  "expect": "Hosts of the migrated VLANs on this pair are learned"
+ },
+ {
+  "device": "DC2-NXLF-02",
+  "step": "M4",
+  "command": "show ip route vrf TRUST 0.0.0.0/0",
+  "expect": "Via 10.120.241.13 and 10.120.241.14 (LF-03/LF-04 PIPs), encap VXLAN"
+ },
+ {
+  "device": "DC2-NXLF-02",
+  "step": "M5",
+  "command": "show ip route vrf TRUST 10.110.10.0/24",
+  "expect": "Via 10.120.241.200 (local BGW Multi-Site VIP), encap VXLAN"
+ },
+ {
+  "device": "DC2-NXLF-03",
+  "step": "M1",
+  "command": "show bgp ipv4 unicast summary",
+  "expect": "Established: 10.120.242.4 (AS 65220, DC2-NXSP-01), 10.120.242.36 (AS 65220, DC2-NXSP-02), 10.120.243.14 (AS 65224, DC2-NXLF-04)"
+ },
+ {
+  "device": "DC2-NXLF-03",
+  "step": "M1",
+  "command": "show bgp l2vpn evpn summary",
+  "expect": "Established: 10.120.240.1 (AS 65220, DC2-NXSP-01), 10.120.240.2 (AS 65220, DC2-NXSP-02)"
+ },
+ {
+  "device": "DC2-NXLF-03",
+  "step": "M1",
+  "command": "show bfd neighbors",
+  "expect": "Up: 10.120.242.4, 10.120.242.36, 10.120.243.14"
+ },
+ {
+  "device": "DC2-NXLF-03",
+  "step": "M1",
+  "command": "show vpc brief",
+  "expect": "Domain 122: peer adjacency formed ok, peer-keepalive alive (10.120.243.10, VRF KEEPALIVE), peer-link Po10 up, type-1 consistency success"
+ },
+ {
+  "device": "DC2-NXLF-03",
+  "step": "M1",
+  "command": "show nve vni",
+  "expect": "Up: L3VNI 50010 (VRF TRUST); L2VNIs 120010, 120020, 120030, 120040, 120100 (BGP, SA)"
+ },
+ {
+  "device": "DC2-NXLF-03",
+  "step": "M1",
+  "command": "show nve interface nve1 detail",
+  "expect": "Source loopback1 primary 10.120.241.13, secondary 10.120.241.102; advertise-pip and advertise virtual-rmac enabled"
+ },
+ {
+  "device": "DC2-NXLF-03",
+  "step": "M1",
+  "command": "show ntp peer-status",
+  "expect": "Synchronized (*) to one of 10.250.0.123, 10.250.1.123, VRF management"
+ },
+ {
+  "device": "DC2-NXLF-03",
+  "step": "M1",
+  "command": "show tacacs-server",
+  "expect": "Servers 10.250.0.49, 10.250.1.49; test login with a TACACS account"
+ },
+ {
+  "device": "DC2-NXLF-03",
+  "step": "M2",
+  "command": "show bgp vrf TRUST ipv4 unicast summary",
+  "expect": "Established: 10.120.99.2 (AS 65228, legacy core)"
+ },
+ {
+  "device": "DC2-NXLF-03",
+  "step": "M2",
+  "command": "show ip route vrf TRUST 0.0.0.0/0",
+  "expect": "Via the legacy core (AS 65228), local preference 50"
+ },
+ {
+  "device": "DC2-NXLF-03",
+  "step": "M3",
+  "command": "show ip interface brief vrf TRUST",
+  "expect": "Up/up as each VLAN is cut over: Vlan10 10.120.10.1, Vlan20 10.120.20.1, Vlan30 10.120.30.1, Vlan40 10.120.40.1, Vlan100 10.120.100.1"
+ },
+ {
+  "device": "DC2-NXLF-03",
+  "step": "M3",
+  "command": "show fabric forwarding ip local-host-db vrf TRUST",
+  "expect": "Hosts of the migrated VLANs on this pair are learned"
+ },
+ {
+  "device": "DC2-NXLF-03",
+  "step": "M4",
+  "command": "show bgp vrf TRUST ipv4 unicast summary",
+  "expect": "Established: 10.120.244.65 (AS 65227, DC2-FW-01/02); 1 prefix received"
+ },
+ {
+  "device": "DC2-NXLF-03",
+  "step": "M4",
+  "command": "show ip route vrf TRUST 0.0.0.0/0",
+  "expect": "Via 10.120.244.65 (eBGP), not the legacy core"
+ },
+ {
+  "device": "DC2-NXLF-03",
+  "step": "M5",
+  "command": "show ip route vrf TRUST 10.110.10.0/24",
+  "expect": "Via 10.120.241.200 (local BGW Multi-Site VIP), encap VXLAN"
+ },
+ {
+  "device": "DC2-NXLF-03",
+  "step": "M6",
+  "command": "show bgp vrf TRUST ipv4 unicast summary",
+  "expect": "No neighbor 10.120.99.2; migration block removed (Po30, Vlan99, RM-LEGACY-*)"
+ },
+ {
+  "device": "DC2-NXLF-04",
+  "step": "M1",
+  "command": "show bgp ipv4 unicast summary",
+  "expect": "Established: 10.120.242.6 (AS 65220, DC2-NXSP-01), 10.120.242.38 (AS 65220, DC2-NXSP-02), 10.120.243.13 (AS 65223, DC2-NXLF-03)"
+ },
+ {
+  "device": "DC2-NXLF-04",
+  "step": "M1",
+  "command": "show bgp l2vpn evpn summary",
+  "expect": "Established: 10.120.240.1 (AS 65220, DC2-NXSP-01), 10.120.240.2 (AS 65220, DC2-NXSP-02)"
+ },
+ {
+  "device": "DC2-NXLF-04",
+  "step": "M1",
+  "command": "show bfd neighbors",
+  "expect": "Up: 10.120.242.6, 10.120.242.38, 10.120.243.13"
+ },
+ {
+  "device": "DC2-NXLF-04",
+  "step": "M1",
+  "command": "show vpc brief",
+  "expect": "Domain 122: peer adjacency formed ok, peer-keepalive alive (10.120.243.9, VRF KEEPALIVE), peer-link Po10 up, type-1 consistency success"
+ },
+ {
+  "device": "DC2-NXLF-04",
+  "step": "M1",
+  "command": "show nve vni",
+  "expect": "Up: L3VNI 50010 (VRF TRUST); L2VNIs 120010, 120020, 120030, 120040, 120100 (BGP, SA)"
+ },
+ {
+  "device": "DC2-NXLF-04",
+  "step": "M1",
+  "command": "show nve interface nve1 detail",
+  "expect": "Source loopback1 primary 10.120.241.14, secondary 10.120.241.102; advertise-pip and advertise virtual-rmac enabled"
+ },
+ {
+  "device": "DC2-NXLF-04",
+  "step": "M1",
+  "command": "show ntp peer-status",
+  "expect": "Synchronized (*) to one of 10.250.0.123, 10.250.1.123, VRF management"
+ },
+ {
+  "device": "DC2-NXLF-04",
+  "step": "M1",
+  "command": "show tacacs-server",
+  "expect": "Servers 10.250.0.49, 10.250.1.49; test login with a TACACS account"
+ },
+ {
+  "device": "DC2-NXLF-04",
+  "step": "M2",
+  "command": "show bgp vrf TRUST ipv4 unicast summary",
+  "expect": "Established: 10.120.99.2 (AS 65228, legacy core)"
+ },
+ {
+  "device": "DC2-NXLF-04",
+  "step": "M2",
+  "command": "show ip route vrf TRUST 0.0.0.0/0",
+  "expect": "Via the legacy core (AS 65228), local preference 50"
+ },
+ {
+  "device": "DC2-NXLF-04",
+  "step": "M3",
+  "command": "show ip interface brief vrf TRUST",
+  "expect": "Up/up as each VLAN is cut over: Vlan10 10.120.10.1, Vlan20 10.120.20.1, Vlan30 10.120.30.1, Vlan40 10.120.40.1, Vlan100 10.120.100.1"
+ },
+ {
+  "device": "DC2-NXLF-04",
+  "step": "M3",
+  "command": "show fabric forwarding ip local-host-db vrf TRUST",
+  "expect": "Hosts of the migrated VLANs on this pair are learned"
+ },
+ {
+  "device": "DC2-NXLF-04",
+  "step": "M4",
+  "command": "show bgp vrf TRUST ipv4 unicast summary",
+  "expect": "Established: 10.120.244.73 (AS 65227, DC2-FW-01/02); 1 prefix received"
+ },
+ {
+  "device": "DC2-NXLF-04",
+  "step": "M4",
+  "command": "show ip route vrf TRUST 0.0.0.0/0",
+  "expect": "Via 10.120.244.73 (eBGP), not the legacy core"
+ },
+ {
+  "device": "DC2-NXLF-04",
+  "step": "M5",
+  "command": "show ip route vrf TRUST 10.110.10.0/24",
+  "expect": "Via 10.120.241.200 (local BGW Multi-Site VIP), encap VXLAN"
+ },
+ {
+  "device": "DC2-NXLF-04",
+  "step": "M6",
+  "command": "show bgp vrf TRUST ipv4 unicast summary",
+  "expect": "No neighbor 10.120.99.2; migration block removed (Po30, Vlan99, RM-LEGACY-*)"
+ },
+ {
+  "device": "DC2-NXBGW-01",
+  "step": "M1",
+  "command": "show bgp ipv4 unicast summary",
+  "expect": "Established: 10.120.242.8 (AS 65220, DC2-NXSP-01), 10.120.242.40 (AS 65220, DC2-NXSP-02)"
+ },
+ {
+  "device": "DC2-NXBGW-01",
+  "step": "M1",
+  "command": "show bgp l2vpn evpn summary",
+  "expect": "Established: 10.120.240.1 (AS 65220, DC2-NXSP-01), 10.120.240.2 (AS 65220, DC2-NXSP-02)"
+ },
+ {
+  "device": "DC2-NXBGW-01",
+  "step": "M1",
+  "command": "show bfd neighbors",
+  "expect": "Up: 10.120.242.8, 10.120.242.40"
+ },
+ {
+  "device": "DC2-NXBGW-01",
+  "step": "M1",
+  "command": "show nve multisite fabric-links",
+  "expect": "Up: Ethernet1/49, Ethernet1/50"
+ },
+ {
+  "device": "DC2-NXBGW-01",
+  "step": "M1",
+  "command": "show nve vni",
+  "expect": "Up: L3VNI 50010 (VRF TRUST); no L2VNIs"
+ },
+ {
+  "device": "DC2-NXBGW-01",
+  "step": "M1",
+  "command": "show ntp peer-status",
+  "expect": "Synchronized (*) to one of 10.250.0.123, 10.250.1.123, VRF management"
+ },
+ {
+  "device": "DC2-NXBGW-01",
+  "step": "M1",
+  "command": "show tacacs-server",
+  "expect": "Servers 10.250.0.49, 10.250.1.49; test login with a TACACS account"
+ },
+ {
+  "device": "DC2-NXBGW-01",
+  "step": "M5",
+  "command": "show nve multisite dci-links",
+  "expect": "Up: Ethernet1/51, Ethernet1/52"
+ },
+ {
+  "device": "DC2-NXBGW-01",
+  "step": "M5",
+  "command": "show bgp ipv4 unicast summary",
+  "expect": "Established: 10.120.242.8 (AS 65220, DC2-NXSP-01), 10.120.242.40 (AS 65220, DC2-NXSP-02), 10.110.246.0 (AS 65215, DC1-NXBGW-01), 10.120.246.3 (AS 65216, DC1-NXBGW-02)"
+ },
+ {
+  "device": "DC2-NXBGW-01",
+  "step": "M5",
+  "command": "show bgp l2vpn evpn summary",
+  "expect": "Established: 10.120.240.1 (AS 65220, DC2-NXSP-01), 10.120.240.2 (AS 65220, DC2-NXSP-02), 10.110.240.21 (AS 65215, DC1-NXBGW-01), 10.110.240.22 (AS 65216, DC1-NXBGW-02)"
+ },
+ {
+  "device": "DC2-NXBGW-01",
+  "step": "M5",
+  "command": "show bgp vrf TRUST ipv4 unicast summary",
+  "expect": "Established: 10.120.244.2 (AS 64512, AWS Direct Connect), 10.120.244.18 (AS 12076, Azure ExpressRoute)"
+ },
+ {
+  "device": "DC2-NXBGW-01",
+  "step": "M5",
+  "command": "show nve peers",
+  "expect": "Includes 10.110.241.200 (the DC1 Multi-Site VIP), Up"
+ },
+ {
+  "device": "DC2-NXBGW-01",
+  "step": "M5",
+  "command": "show ip route vrf TRUST 10.200.0.0/16",
+  "expect": "Via 10.120.244.2 (AWS, AS 64512)"
+ },
+ {
+  "device": "DC2-NXBGW-01",
+  "step": "M5",
+  "command": "show ip route vrf TRUST 10.210.0.0/16",
+  "expect": "Via 10.120.244.18 (Azure, AS 12076)"
+ },
+ {
+  "device": "DC2-NXBGW-02",
+  "step": "M1",
+  "command": "show bgp ipv4 unicast summary",
+  "expect": "Established: 10.120.242.10 (AS 65220, DC2-NXSP-01), 10.120.242.42 (AS 65220, DC2-NXSP-02)"
+ },
+ {
+  "device": "DC2-NXBGW-02",
+  "step": "M1",
+  "command": "show bgp l2vpn evpn summary",
+  "expect": "Established: 10.120.240.1 (AS 65220, DC2-NXSP-01), 10.120.240.2 (AS 65220, DC2-NXSP-02)"
+ },
+ {
+  "device": "DC2-NXBGW-02",
+  "step": "M1",
+  "command": "show bfd neighbors",
+  "expect": "Up: 10.120.242.10, 10.120.242.42"
+ },
+ {
+  "device": "DC2-NXBGW-02",
+  "step": "M1",
+  "command": "show nve multisite fabric-links",
+  "expect": "Up: Ethernet1/49, Ethernet1/50"
+ },
+ {
+  "device": "DC2-NXBGW-02",
+  "step": "M1",
+  "command": "show nve vni",
+  "expect": "Up: L3VNI 50010 (VRF TRUST); no L2VNIs"
+ },
+ {
+  "device": "DC2-NXBGW-02",
+  "step": "M1",
+  "command": "show ntp peer-status",
+  "expect": "Synchronized (*) to one of 10.250.0.123, 10.250.1.123, VRF management"
+ },
+ {
+  "device": "DC2-NXBGW-02",
+  "step": "M1",
+  "command": "show tacacs-server",
+  "expect": "Servers 10.250.0.49, 10.250.1.49; test login with a TACACS account"
+ },
+ {
+  "device": "DC2-NXBGW-02",
+  "step": "M5",
+  "command": "show nve multisite dci-links",
+  "expect": "Up: Ethernet1/51, Ethernet1/52"
+ },
+ {
+  "device": "DC2-NXBGW-02",
+  "step": "M5",
+  "command": "show bgp ipv4 unicast summary",
+  "expect": "Established: 10.120.242.10 (AS 65220, DC2-NXSP-01), 10.120.242.42 (AS 65220, DC2-NXSP-02), 10.110.246.2 (AS 65216, DC1-NXBGW-02), 10.120.246.1 (AS 65215, DC1-NXBGW-01)"
+ },
+ {
+  "device": "DC2-NXBGW-02",
+  "step": "M5",
+  "command": "show bgp l2vpn evpn summary",
+  "expect": "Established: 10.120.240.1 (AS 65220, DC2-NXSP-01), 10.120.240.2 (AS 65220, DC2-NXSP-02), 10.110.240.21 (AS 65215, DC1-NXBGW-01), 10.110.240.22 (AS 65216, DC1-NXBGW-02)"
+ },
+ {
+  "device": "DC2-NXBGW-02",
+  "step": "M5",
+  "command": "show bgp vrf TRUST ipv4 unicast summary",
+  "expect": "Established: 10.120.244.10 (AS 64512, AWS Direct Connect), 10.120.244.22 (AS 12076, Azure ExpressRoute)"
+ },
+ {
+  "device": "DC2-NXBGW-02",
+  "step": "M5",
+  "command": "show nve peers",
+  "expect": "Includes 10.110.241.200 (the DC1 Multi-Site VIP), Up"
+ },
+ {
+  "device": "DC2-NXBGW-02",
+  "step": "M5",
+  "command": "show ip route vrf TRUST 10.200.0.0/16",
+  "expect": "Via 10.120.244.10 (AWS, AS 64512)"
+ },
+ {
+  "device": "DC2-NXBGW-02",
+  "step": "M5",
+  "command": "show ip route vrf TRUST 10.210.0.0/16",
+  "expect": "Via 10.120.244.22 (Azure, AS 12076)"
+ }
+]

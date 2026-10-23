@@ -83,6 +83,11 @@ def validate(data):
     asns += [x["asn"]["spine"] for x in sites] + [data["cloud"]["aws_asn"], data["cloud"]["azure_asn"]]
     distinct("BGP AS", asns)
 
+    steps = [r[0] for r in data["doc"]["migration"]]
+    missing = [s for s in STEP.values() if s not in steps]
+    if missing:
+        errors.append(f"doc migration table needs steps {missing} (the configs and checks refer to them)")
+
     mode = data.get("dci", {}).get("mode", "pair")
     if mode not in ("pair", "full-mesh"):
         errors.append(f"dci mode {mode!r} must be 'pair' or 'full-mesh'")
@@ -201,6 +206,9 @@ AWS_PORT, AZURE_PORT = "Ethernet1/1", "Ethernet1/2"
 ANYCAST_MAC = "2020.0000.00aa"
 
 TRUST = dict(name="TRUST", id=10, l3vni=50010, vlan=3910, rt="65000:50010")
+
+# Migration steps the configs and checks refer to; the data file's migration table must use the same IDs.
+STEP = dict(build="M1", legacy="M2", gateways="M3", firewall="M4", multisite="M5", cleanup="M6")
 
 def cloud_links(site, bgw):
     """(AWS /30 net, BGW IP, AWS IP, Azure /30 net, BGW IP, MSEE IP, label) for one BGW.
@@ -465,7 +473,7 @@ def host_vlan_cfg(site):
     lines.append("")
     for v, n in vl:
         lines += [f"interface Vlan{v}", f"  description {n} (anycast gateway)",
-                  "  shutdown                        ! no shutdown at this VLAN's gateway cut-over (migration M4)",
+                  f"  shutdown                        ! no shutdown at this VLAN's gateway cut-over ({STEP['gateways']})",
                   "  mtu 9216", f"  vrf member {TRUST['name']}", "  no ip redirects",
                   f"  ip address 10.{o}.{v}.1/24", "  fabric forwarding mode anycast-gateway", ""]
     lines.append("! Explicit RTs: with a different ASN per leaf, 'auto' would give every leaf a different RT.")
@@ -717,9 +725,9 @@ route-map RM-FW-IN permit 10          ! the firewall sends only the default rout
 route-map RM-FW-OUT permit 10         ! both sites' specifics (beat the firewall's IPsec statics)
   match ip address prefix-list PL-{site}-SITE PL-{other}-SITE
 
-! ---- migration only (M2-M5): eBGP to the legacy core over VLAN {lv} -------
+! ---- migration only ({STEP['legacy']} until {STEP['cleanup']}): eBGP to the legacy core over VLAN {lv} -
 ! The legacy core must run BGP (AS {ASN_PLAN[site]['core']}) for the migration window and
-! redistribute its connected/OSPF routes into it. Remove this block at M7.
+! redistribute its connected/OSPF routes into it. Remove this block at {STEP['cleanup']}.
 vlan {lv}
   name LEGACY-CORE-10.{o}.{lv}.0
 
@@ -755,7 +763,7 @@ route-map RM-LEGACY-IN deny 5         ! never take our own routes back from the 
   match as-path AL-{site}-FABRIC
 route-map RM-LEGACY-IN permit 10      ! legacy subnets not yet migrated
   match ip address prefix-list PL-{site}-SITE
-route-map RM-LEGACY-IN permit 20      ! legacy default until the firewall moves (M5)
+route-map RM-LEGACY-IN permit 20      ! legacy default until the firewall moves ({STEP['firewall']})
   match ip address prefix-list PL-DEFAULT
   set local-preference 50
 route-map RM-LEGACY-OUT permit 10
@@ -804,7 +812,7 @@ set network virtual-router {fw['vr']} routing-table ip static-route {fs['name']}
     return f"""
 # =============================================================================
 # {S['fws'][0]} / {S['fws'][1]} · firewall handoff to the fabric ({fw['panos']}, configure mode)
-# {DATA['doc']['classification_short']} Apply on the active member in the M5 change window; HA syncs the peer.
+# {DATA['doc']['classification_short']} Apply on the active member in the {STEP['firewall']} change window; HA syncs the peer.
 # Replaces {fw['old_interface']} (10.{o}.{legacy_vlan()}.{fw['old_host']}/24) + OSPF with two routed interfaces + eBGP (AS {fw_as}).
 # Before committing: check that no security, NAT or PBF rule references {fw['old_interface']}, and review
 # "show config diff". Validate each command on the box.
@@ -1191,7 +1199,7 @@ def header(site, idx):
 ! {DATA['doc']['config_title']}
 ! {DATA['doc']['classification']}
 ! Template: validate against the exact Nexus model and NX-OS release before use.
-! Fill in every <placeholder>. Host-gateway SVIs ship shut (migration step M4).
+! Fill in every <placeholder>. Host-gateway SVIs ship shut (migration step {STEP['gateways']}).
 ! {baseline_line}
 !==============================================================================
 """.strip("\n")
@@ -1211,6 +1219,171 @@ def full_config(site, idx):
     base = baseline_cfg(site, idx)
     extra = ["", base] if base else []
     return "\n".join([header(site, idx), "", lines[0], "", mgmt_cfg(site, idx)] + extra + lines[1:]) + "\n"
+
+
+# ---------------------------------------------------------------------------
+# Day-2 checks: what each switch should show after each migration step
+# ---------------------------------------------------------------------------
+def bgp_sessions(site, idx):
+    """Every BGP session one switch should have: (step, vrf, afi, neighbor IP, remote AS, peer name)."""
+    S = SITES[site]
+    o = S["o"]
+    me = DEVICES[idx]
+    suf = me[1]
+    spine_asn = ASN_PLAN[site]["spine"]
+    out = []
+    if suf.startswith("NXSP"):
+        for di, down in enumerate(DOWNSTREAM):
+            _, b = p2p(site, idx, di)
+            l0 = next(d[2] for d in DEVICES if d[1] == down)
+            out.append((STEP["build"], "default", "ipv4", b, dev_asn(site, down), host(site, down)))
+            out.append((STEP["build"], "default", "evpn", f"10.{o}.240.{l0}", dev_asn(site, down), host(site, down)))
+        return out
+    di = DOWNSTREAM.index(suf)
+    for si, spine in enumerate(("NXSP-01", "NXSP-02")):
+        a, _ = p2p(site, si, di)
+        out.append((STEP["build"], "default", "ipv4", a, spine_asn, host(site, spine)))
+        out.append((STEP["build"], "default", "evpn", f"10.{o}.240.{si + 1}", spine_asn, host(site, spine)))
+    if suf.startswith("NXLF"):
+        pair = me[6]
+        mate = DEVICES[idx + 1] if idx % 2 == 0 else DEVICES[idx - 1]
+        k = pair * 8
+        bk_peer = k + 6 if idx % 2 == 0 else k + 5
+        out.append((STEP["build"], "default", "ipv4", f"10.{o}.243.{bk_peer}", dev_asn(site, mate[1]), host(site, mate[1])))
+        if suf in ("NXLF-03", "NXLF-04"):
+            core_ip = S["core99"] or f"<{site}-CORE-VLAN{legacy_vlan()}-IP>"
+            out.append((STEP["legacy"], TRUST["name"], "ipv4", core_ip, ASN_PLAN[site]["core"], "legacy core"))
+            _, _, fw_ip, _, _ = fw_transit(site, suf)
+            out.append((STEP["firewall"], TRUST["name"], "ipv4", fw_ip, ASN_PLAN[site]["fw"], S["fw_pair"]))
+        return out
+    peer = S["peer"]
+    po = SITES[peer]["o"]
+    for _, _, _, rs, rb, rip in bgw_dci(site, suf):
+        out.append((STEP["multisite"], "default", "ipv4", rip, dev_asn(rs, rb), host(rs, rb)))
+    for rb, l0 in (("NXBGW-01", 21), ("NXBGW-02", 22)):
+        out.append((STEP["multisite"], "default", "evpn", f"10.{po}.240.{l0}", dev_asn(peer, rb), host(peer, rb)))
+    _, _, aws_peer, _, _, az_peer, _ = cloud_links(site, suf)
+    out.append((STEP["multisite"], TRUST["name"], "ipv4", aws_peer, AWS_ASN, "AWS Direct Connect"))
+    out.append((STEP["multisite"], TRUST["name"], "ipv4", az_peer, AZURE_ASN, "Azure ExpressRoute"))
+    return out
+
+
+def device_checks(site, idx):
+    """(step, command, expected result) for one switch, in migration order."""
+    S = SITES[site]
+    o = S["o"]
+    suf = DEVICES[idx][1]
+    sessions = bgp_sessions(site, idx)
+    checks = []
+
+    def peers(step, vrf, afi, upto=False):
+        rows = [x for x in sessions if x[1] == vrf and x[2] == afi
+                and (x[0] <= step if upto else x[0] == step)]
+        return ", ".join(f"{ip} (AS {asn}, {name})" for _, _, _, ip, asn, name in rows)
+
+    def bgp(step, vrf, afi, upto=False):
+        if not any(x[0] == step and x[1] == vrf and x[2] == afi for x in sessions):
+            return
+        cmd = {"ipv4": "show bgp ipv4 unicast summary", "evpn": "show bgp l2vpn evpn summary"}[afi]
+        if vrf != "default":
+            cmd = f"show bgp vrf {vrf} ipv4 unicast summary"
+        checks.append((step, cmd, "Established: " + peers(step, vrf, afi, upto)))
+
+    b = STEP["build"]
+    bgp(b, "default", "ipv4")
+    bgp(b, "default", "evpn")
+    bfd = [ip for st, vrf, afi, ip, _, _ in sessions if st == b and vrf == "default" and afi == "ipv4"]
+    checks.append((b, "show bfd neighbors", f"Up: {', '.join(bfd)}"))
+    if suf.startswith("NXLF"):
+        pair = DEVICES[idx][6]
+        k = pair * 8
+        ka_peer = k + 2 if idx % 2 == 0 else k + 1
+        checks.append((b, "show vpc brief", f"Domain {S['vpc'][pair]}: peer adjacency formed ok, peer-keepalive alive "
+                                            f"(10.{o}.243.{ka_peer}, VRF KEEPALIVE), peer-link Po10 up, type-1 consistency success"))
+        l2 = ", ".join(str(S["vni"] + v) for v, _ in site_host_vlans(site))
+        checks.append((b, "show nve vni", f"Up: L3VNI {TRUST['l3vni']} (VRF {TRUST['name']}); L2VNIs {l2} (BGP, SA)"))
+        checks.append((b, "show nve interface nve1 detail",
+                       f"Source loopback1 primary 10.{o}.241.{DEVICES[idx][3]}, secondary 10.{o}.241.{DEVICES[idx][4]}; "
+                       "advertise-pip and advertise virtual-rmac enabled"))
+    if suf.startswith("NXBGW"):
+        checks.append((b, "show nve multisite fabric-links", "Up: Ethernet1/49, Ethernet1/50"))
+        checks.append((b, "show nve vni", f"Up: L3VNI {TRUST['l3vni']} (VRF {TRUST['name']}); no L2VNIs"))
+    bl = DATA.get("baseline")
+    if bl:
+        checks.append((b, "show ntp peer-status", f"Synchronized (*) to one of {', '.join(bl['ntp'])}, VRF management"))
+        checks.append((b, "show tacacs-server", f"Servers {', '.join(bl['tacacs'])}; test login with a TACACS account"))
+
+    if suf in ("NXLF-03", "NXLF-04"):
+        bgp(STEP["legacy"], TRUST["name"], "ipv4")
+        checks.append((STEP["legacy"], f"show ip route vrf {TRUST['name']} 0.0.0.0/0",
+                       f"Via the legacy core (AS {ASN_PLAN[site]['core']}), local preference 50"))
+    if suf.startswith("NXLF"):
+        svis = ", ".join(f"Vlan{v} 10.{o}.{v}.1" for v, _ in site_host_vlans(site))
+        checks.append((STEP["gateways"], f"show ip interface brief vrf {TRUST['name']}",
+                       f"Up/up as each VLAN is cut over: {svis}"))
+        checks.append((STEP["gateways"], f"show fabric forwarding ip local-host-db vrf {TRUST['name']}",
+                       "Hosts of the migrated VLANs on this pair are learned"))
+    if suf in ("NXLF-03", "NXLF-04"):
+        _, _, fw_ip, _, _ = fw_transit(site, suf)
+        checks.append((STEP["firewall"], f"show bgp vrf {TRUST['name']} ipv4 unicast summary",
+                       f"Established: {peers(STEP['firewall'], TRUST['name'], 'ipv4')}; 1 prefix received"))
+        checks.append((STEP["firewall"], f"show ip route vrf {TRUST['name']} 0.0.0.0/0", f"Via {fw_ip} (eBGP), not the legacy core"))
+    elif suf.startswith("NXLF"):
+        checks.append((STEP["firewall"], f"show ip route vrf {TRUST['name']} 0.0.0.0/0",
+                       f"Via 10.{o}.241.13 and 10.{o}.241.14 (LF-03/LF-04 PIPs), encap VXLAN"))
+
+    if suf.startswith("NXBGW"):
+        m = STEP["multisite"]
+        ports = ", ".join(sorted(port for _, port, _, _, _, _ in bgw_dci(site, suf)))
+        checks.append((m, "show nve multisite dci-links", f"Up: {ports}"))
+        bgp(m, "default", "ipv4", upto=True)
+        bgp(m, "default", "evpn", upto=True)
+        bgp(m, TRUST["name"], "ipv4")
+        po = SITES[S["peer"]]["o"]
+        checks.append((m, "show nve peers", f"Includes 10.{po}.241.{BGW_VIP} (the {S['peer']} Multi-Site VIP), Up"))
+        _, _, aws_peer, _, _, az_peer, _ = cloud_links(site, suf)
+        if CLOUD_AWS:
+            checks.append((m, f"show ip route vrf {TRUST['name']} {CLOUD_AWS[0]}", f"Via {aws_peer} (AWS, AS {AWS_ASN})"))
+        if CLOUD_AZURE:
+            checks.append((m, f"show ip route vrf {TRUST['name']} {CLOUD_AZURE[0]}", f"Via {az_peer} (Azure, AS {AZURE_ASN})"))
+    elif suf.startswith("NXLF"):
+        P = SITES[S["peer"]]
+        if P["host_vlans"]:
+            v = P["host_vlans"][0][0]
+            checks.append((STEP["multisite"], f"show ip route vrf {TRUST['name']} 10.{P['o']}.{v}.0/24",
+                           f"Via 10.{o}.241.{BGW_VIP} (local BGW Multi-Site VIP), encap VXLAN"))
+
+    if suf in ("NXLF-03", "NXLF-04"):
+        core_ip = S["core99"] or f"<{site}-CORE-VLAN{legacy_vlan()}-IP>"
+        checks.append((STEP["cleanup"], f"show bgp vrf {TRUST['name']} ipv4 unicast summary",
+                       f"No neighbor {core_ip}; migration block removed (Po30, Vlan{legacy_vlan()}, RM-LEGACY-*)"))
+    order = list(STEP.values())
+    return sorted(checks, key=lambda c: order.index(c[0]))
+
+
+def checks_text(site, idx):
+    name = host(site, DEVICES[idx][1])
+    titles = {r[0]: r[1] for r in DATA["doc"]["migration"]}
+    lines = [f"# {name} · day-2 checks by migration step", f"# {DATA['doc']['classification']}", ""]
+    step = None
+    for st, cmd, expect in device_checks(site, idx):
+        if st != step:
+            lines += ["", f"## {st} · {titles.get(st, '')}"] if step else [f"## {st} · {titles.get(st, '')}"]
+            step = st
+        lines += [f"{name}# {cmd}", f"  expect: {expect}"]
+    return "\n".join(lines) + "\n"
+
+
+def write_checks(outdir):
+    outdir.mkdir(exist_ok=True)
+    everything = []
+    for site in SITE_ORDER:
+        for idx, dev in enumerate(DEVICES):
+            name = host(site, dev[1])
+            (outdir / f"{name}.txt").write_text(checks_text(site, idx), encoding="utf-8")
+            everything += [dict(device=name, step=st, command=cmd, expect=exp) for st, cmd, exp in device_checks(site, idx)]
+    (outdir / "checks.json").write_text(json.dumps(everything, indent=1) + "\n", encoding="utf-8")
+    return len(everything)
 
 
 def write_configs(outdir):
@@ -1442,9 +1615,23 @@ def build():
     sec.append(("configs", "9. NX-OS configuration templates", "\n" + c["intro"] + "\n" + c["note"] + "\n" + "".join(cfgs) + "\n"))
 
     sec.append(("migration", d.get("migration_title", "10. Migration from the legacy core"),
-                table(["Step", "What", "Detail", "Risk"], d["migration"])))
+                table(["Step", "What", "Detail", "Risk"], d["migration"])
+                + "<p>Every switch has a check list for each step in <code>checks/</code> (and section 13).</p>"))
     sec.append(("tests", "11. Failure test matrix", table(["Failure", "Expected result", "Evidence"], d["tests"])))
     sec.append(("open", "12. Open items before implementation", table(["Item", "What is needed"], d["open_items"])))
+    chk = []
+    for site in SITE_ORDER:
+        chk.append(f"<h3>{site}</h3>")
+        for idx, dev in enumerate(DEVICES):
+            name = host(site, dev[1])
+            rows = [[esc(st), mono(cmd), esc(exp)] for st, cmd, exp in device_checks(site, idx)]
+            chk.append(f'<details><summary>{name} · {len(rows)} checks · <a href="checks/{name}.txt">{name}.txt</a></summary>'
+                       f'{table(["Step", "Command", "Expect"], rows, "compact")}</details>')
+    sec.append(("checks", "13. Day-2 checks by migration step",
+                "\n<p>What each switch should show once each migration step is done. The same list is in "
+                "<code>checks/&lt;switch&gt;.txt</code> and, for automation, <code>checks/checks.json</code>. "
+                "Expected BGP sessions, VNIs, vPC and DCI links are generated from the same model as the "
+                "configs, and the tests check that the two agree.</p>" + "".join(chk) + "\n"))
 
     nav = "".join(f'<a href="#{sid}">{esc(t_)}</a>' for sid, t_, _ in sec)
     body = "".join(f'<section id="{sid}"><h2>{esc(t_)}</h2>{content}</section>' for sid, t_, content in sec)
@@ -1471,6 +1658,8 @@ def main(argv=None):
     print("wrote", page)
     files = write_configs(args.out / "configs")
     print("wrote", len(files), "files to", args.out / "configs")
+    n = write_checks(args.out / "checks")
+    print("wrote", n, "checks to", args.out / "checks")
     return 0
 
 

@@ -1,0 +1,14 @@
+# DC1-NXSP-01 · day-2 checks by migration step
+# FICTIONAL DEMO DATA: not for any real network.
+
+## M1 · Build each fabric
+DC1-NXSP-01# show bgp ipv4 unicast summary
+  expect: Established: 10.110.242.1 (AS 65211, DC1-NXLF-01), 10.110.242.3 (AS 65212, DC1-NXLF-02), 10.110.242.5 (AS 65213, DC1-NXLF-03), 10.110.242.7 (AS 65214, DC1-NXLF-04), 10.110.242.9 (AS 65215, DC1-NXBGW-01), 10.110.242.11 (AS 65216, DC1-NXBGW-02)
+DC1-NXSP-01# show bgp l2vpn evpn summary
+  expect: Established: 10.110.240.11 (AS 65211, DC1-NXLF-01), 10.110.240.12 (AS 65212, DC1-NXLF-02), 10.110.240.13 (AS 65213, DC1-NXLF-03), 10.110.240.14 (AS 65214, DC1-NXLF-04), 10.110.240.21 (AS 65215, DC1-NXBGW-01), 10.110.240.22 (AS 65216, DC1-NXBGW-02)
+DC1-NXSP-01# show bfd neighbors
+  expect: Up: 10.110.242.1, 10.110.242.3, 10.110.242.5, 10.110.242.7, 10.110.242.9, 10.110.242.11
+DC1-NXSP-01# show ntp peer-status
+  expect: Synchronized (*) to one of 10.250.0.123, 10.250.1.123, VRF management
+DC1-NXSP-01# show tacacs-server
+  expect: Servers 10.250.0.49, 10.250.1.49; test login with a TACACS account

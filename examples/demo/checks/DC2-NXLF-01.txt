@@ -1,0 +1,34 @@
+# DC2-NXLF-01 · day-2 checks by migration step
+# FICTIONAL DEMO DATA: not for any real network.
+
+## M1 · Build each fabric
+DC2-NXLF-01# show bgp ipv4 unicast summary
+  expect: Established: 10.120.242.0 (AS 65220, DC2-NXSP-01), 10.120.242.32 (AS 65220, DC2-NXSP-02), 10.120.243.6 (AS 65222, DC2-NXLF-02)
+DC2-NXLF-01# show bgp l2vpn evpn summary
+  expect: Established: 10.120.240.1 (AS 65220, DC2-NXSP-01), 10.120.240.2 (AS 65220, DC2-NXSP-02)
+DC2-NXLF-01# show bfd neighbors
+  expect: Up: 10.120.242.0, 10.120.242.32, 10.120.243.6
+DC2-NXLF-01# show vpc brief
+  expect: Domain 121: peer adjacency formed ok, peer-keepalive alive (10.120.243.2, VRF KEEPALIVE), peer-link Po10 up, type-1 consistency success
+DC2-NXLF-01# show nve vni
+  expect: Up: L3VNI 50010 (VRF TRUST); L2VNIs 120010, 120020, 120030, 120040, 120100 (BGP, SA)
+DC2-NXLF-01# show nve interface nve1 detail
+  expect: Source loopback1 primary 10.120.241.11, secondary 10.120.241.101; advertise-pip and advertise virtual-rmac enabled
+DC2-NXLF-01# show ntp peer-status
+  expect: Synchronized (*) to one of 10.250.0.123, 10.250.1.123, VRF management
+DC2-NXLF-01# show tacacs-server
+  expect: Servers 10.250.0.49, 10.250.1.49; test login with a TACACS account
+
+## M3 · Move hosts and gateways
+DC2-NXLF-01# show ip interface brief vrf TRUST
+  expect: Up/up as each VLAN is cut over: Vlan10 10.120.10.1, Vlan20 10.120.20.1, Vlan30 10.120.30.1, Vlan40 10.120.40.1, Vlan100 10.120.100.1
+DC2-NXLF-01# show fabric forwarding ip local-host-db vrf TRUST
+  expect: Hosts of the migrated VLANs on this pair are learned
+
+## M4 · Move the firewalls
+DC2-NXLF-01# show ip route vrf TRUST 0.0.0.0/0
+  expect: Via 10.120.241.13 and 10.120.241.14 (LF-03/LF-04 PIPs), encap VXLAN
+
+## M5 · Multi-Site and cloud
+DC2-NXLF-01# show ip route vrf TRUST 10.110.10.0/24
+  expect: Via 10.120.241.200 (local BGW Multi-Site VIP), encap VXLAN
