@@ -1467,7 +1467,8 @@ def expected_device(site, idx):
         return dev
     l3 = dict(vni=TRUST["l3vni"], type="L3", vrf=TRUST["name"], vlan=TRUST["vlan"], rd="auto",
               route_target=TRUST["rt"])
-    l2 = [dict(vni=S["vni"] + v, type="L2", vlan=v, rd="auto", route_target=f"{S['asn']}:{S['vni'] + v}")
+    l2 = [dict(vni=S["vni"] + v, type="L2", vlan=v, rd="auto", route_target=f"{S['asn']}:{S['vni'] + v}",
+               subnet=f"10.{o}.{v}.0/24", gateway=f"10.{o}.{v}.1")
           for v, _ in site_host_vlans(site)] if suf.startswith("NXLF") else []
     dev["vnis"] = [l3] + l2
     dev["nve"] = dict(source_interface="loopback1", primary=f"10.{o}.241.{me[3]}")

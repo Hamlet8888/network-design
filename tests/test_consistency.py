@@ -586,6 +586,9 @@ class FabricConsistencyTest(unittest.TestCase):
                 self.assertEqual(rts["import"], {want_l2[vni]["route_target"]}, f"{c.name} vni {vni}")
                 self.assertEqual(rts["export"], {want_l2[vni]["route_target"]}, f"{c.name} vni {vni}")
                 self.assertEqual(c.vlan_segments()[want_l2[vni]["vlan"]], vni, f"{c.name} vni {vni}")
+                svi = c.interfaces[f"Vlan{want_l2[vni]['vlan']}"].values("ip address")[0]
+                self.assertEqual(svi, f"{want_l2[vni]['gateway']}/24", f"{c.name} vni {vni}")
+                self.assertEqual(str(ipaddress.ip_interface(svi).network), want_l2[vni]["subnet"], c.name)
             for v in want_l3:
                 self.assertEqual(c.vrfs()[v["vrf"]]["vni"], v["vni"], c.name)
                 self.assertEqual({rt for _, rt, _ in c.vrfs()[v["vrf"]]["rts"]}, {v["route_target"]}, c.name)
