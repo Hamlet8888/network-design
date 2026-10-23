@@ -80,7 +80,7 @@ The expectations come from the same model as the configs, and the tests check th
 [network-automation-tools](https://github.com/Hamlet8888/network-automation-tools) to audit live switches
 against. For every switch it lists the role, ASN, router-ID and mgmt0 address (where the auditor connects), the routed fabric links with MTU and
 address, every BGP session (VRF, address family, neighbor, remote AS, BFD, and the migration step that
-brings it up or, for the legacy core, removes it), the VNIs with their VLAN or VRF and route target, the
+brings it up or, for the legacy core, removes it), the VNIs with their VLAN or VRF, route target and (L2) subnet and anycast gateway, the
 NVE source addresses, the vPC domain and keepalive, and the Multi-Site site ID, VIP, fabric and DCI links.
 `schema_version` changes whenever the format does. A test checks it against the generated configs.
 
