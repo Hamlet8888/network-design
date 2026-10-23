@@ -34,7 +34,7 @@ No OSPF anywhere. All infrastructure addressing sits inside each site's own /16 
 |---|---|
 | `fabric_design/build.py` | The generator: design rules, address plan, NX-OS and PAN-OS templates, workbook |
 | `examples/demo-fabric.json` | Fictional two-site input (DC1/DC2) |
-| `examples/demo/` | Workbook, configs and day-2 checks generated from the demo input |
+| `examples/demo/` | Workbook, configs, day-2 checks and DCI option diagrams generated from the demo input |
 | `tests/` | Input validation and cross-device consistency checks on generated output |
 | `private/` | **Git-ignored.** Real site data and everything generated from it |
 
@@ -111,6 +111,10 @@ addressed from the first site's 10.x.246.0/24 and carrier B from the second's.
 | `full-mesh` (demo) | 4: carrier A joins 01-01 and 02-02, carrier B crosses over (01-02, 02-01) | Eth1/51 carrier A, Eth1/52 carrier B | Every BGW still in service keeps a circuit to a remote BGW still in service, whether a carrier, a circuit or a BGW fails |
 
 The tests fail each carrier, circuit and BGW in turn and check exactly that.
+
+Every build also writes both options as standalone drawings, `diagrams/topology-full-mesh.svg` and
+`diagrams/topology-pair.svg`, and shows them side by side in section 8 of the workbook, whichever mode
+the data file picks.
 
 ## Tests
 
