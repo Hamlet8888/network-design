@@ -29,11 +29,12 @@ CLOUD_AWS = []
 CLOUD_AZURE = []
 AWS_ASN = 64512
 AZURE_ASN = 12076
+DCI_MODE = "pair"   # "pair": one DCI link per BGW; "full-mesh": every BGW to both remote BGWs
 
 
 def load(data):
     """Install a site data document (see examples/demo-fabric.json) as the design input."""
-    global DATA, SITES, SITE_ORDER, ASN_PLAN, TRUST_VLANS, DMZ_VLANS, CLOUD_AWS, CLOUD_AZURE, AWS_ASN, AZURE_ASN
+    global DATA, SITES, SITE_ORDER, ASN_PLAN, TRUST_VLANS, DMZ_VLANS, CLOUD_AWS, CLOUD_AZURE, AWS_ASN, AZURE_ASN, DCI_MODE
     validate(data)
     sites = data["sites"]
     DATA = data
@@ -53,6 +54,7 @@ def load(data):
     c = data["cloud"]
     CLOUD_AWS, CLOUD_AZURE = c["aws_prefixes"], c["azure_prefixes"]
     AWS_ASN, AZURE_ASN = c["aws_asn"], c["azure_asn"]
+    DCI_MODE = data.get("dci", {}).get("mode", "pair")
 
 
 def validate(data):
@@ -80,6 +82,10 @@ def validate(data):
     asns = [a for x in sites for a in x["asn"].values() if a != x["asn"]["spine"]]
     asns += [x["asn"]["spine"] for x in sites] + [data["cloud"]["aws_asn"], data["cloud"]["azure_asn"]]
     distinct("BGP AS", asns)
+
+    mode = data.get("dci", {}).get("mode", "pair")
+    if mode not in ("pair", "full-mesh"):
+        errors.append(f"dci mode {mode!r} must be 'pair' or 'full-mesh'")
 
     legacy = data["legacy"]["vlan"]
     if not 2 <= legacy <= 239:
@@ -182,6 +188,46 @@ def cloud_links(site, bgw):
             ("connection 1", "primary") if k == 0 else ("connection 2", "secondary"))
 
 
+def dci_links():
+    """Every DCI /31: dict(carrier, port, net, ends) with ends = [(site, BGW suffix, IP), ...].
+
+    Carrier A circuits are addressed from site A's 10.x.246.0/24, carrier B from site B's; the
+    owning site takes the even address. "pair" gives each BGW one circuit: carrier A joins the
+    BGW-01s, carrier B the BGW-02s (Eth1/51). "full-mesh" gives each BGW one circuit per carrier
+    to a different remote BGW: carrier A joins 01-01 and 02-02 (Eth1/51), carrier B crosses over,
+    B-01 to A-02 and B-02 to A-01 (Eth1/53). A carrier or a BGW can then fail and every surviving
+    BGW keeps a DCI path, so no BGW is isolated by a single failure.
+    """
+    a, b = A(), B()
+    oa, ob = SITES[a]["o"], SITES[b]["o"]
+    if DCI_MODE == "full-mesh":
+        spec = [("A", "Ethernet1/51", oa, a, "NXBGW-01", b, "NXBGW-01"),
+                ("A", "Ethernet1/51", oa, a, "NXBGW-02", b, "NXBGW-02"),
+                ("B", "Ethernet1/53", ob, b, "NXBGW-02", a, "NXBGW-01"),
+                ("B", "Ethernet1/53", ob, b, "NXBGW-01", a, "NXBGW-02")]
+    else:
+        spec = [("A", "Ethernet1/51", oa, a, "NXBGW-01", b, "NXBGW-01"),
+                ("B", "Ethernet1/51", ob, b, "NXBGW-02", a, "NXBGW-02")]
+    links, used = [], {}
+    for carrier, port, o, own_site, own_bgw, far_site, far_bgw in spec:
+        k = used.get(o, 0)
+        used[o] = k + 2
+        links.append(dict(carrier=carrier, port=port, net=f"10.{o}.246.{k}/31",
+                          ends=[(own_site, own_bgw, f"10.{o}.246.{k}"), (far_site, far_bgw, f"10.{o}.246.{k + 1}")]))
+    return links
+
+
+def bgw_dci(site, bgw):
+    """(carrier, port, my IP, remote site, remote BGW, remote IP) for each DCI link of one BGW."""
+    out = []
+    for link in dci_links():
+        for i, (s_, b_, ip) in enumerate(link["ends"]):
+            if (s_, b_) == (site, bgw):
+                fs, fb, fip = link["ends"][1 - i]
+                out.append((link["carrier"], link["port"], ip, fs, fb, fip))
+    return sorted(out)
+
+
 def host(s, suffix):
     return DATA["hostname_format"].format(site=s, role=suffix)
 
@@ -266,7 +312,8 @@ def blocks_rows():
         ("243.0/24", "vPC peer-keepalive and backup underlay VLAN 3900 (/30s)", "Pair A .0–.7, pair B .8–.15"),
         ("244.0/24", "Day-one cloud peering in VRF TRUST: AWS Direct Connect and Azure ExpressRoute (one /29 slot per peering)", ".0/29 DX conn 1 (BGW-01), .8/29 DX conn 2 (BGW-02), .16/29 ER = primary .16/30 (BGW-01) + secondary .20/30 (BGW-02). .64/29 + .72/29: firewall eBGP transit (LF-03, LF-04). The rest is reserved for per-VRF firewall transit"),
         ("245.0/24", "New OOB management for mgmt0 (gateway on the firewall, not on the fabric)", "Gateway .1, devices .11–.32"),
-        ("246.0/24", "DCI point-to-point /31s (each site owns one carrier)", f"{A()}: carrier A, {B()}: carrier B"),
+        ("246.0/24", "DCI point-to-point /31s (each site owns one carrier)",
+         f"{A()}: carrier A, {B()}: carrier B" + (", two circuits each (full mesh)" if DCI_MODE == "full-mesh" else "")),
         ("247.0/24", "Reserved for growth (more leafs, a second pod)", ""),
     ]
     for suffix, use, detail in spec:
@@ -784,16 +831,23 @@ def cfg_bgw(site, idx):
     di = DOWNSTREAM.index(me[1])
     s1, a1 = p2p(site, 0, di)
     s2, a2 = p2p(site, 1, di)
-    first = me[1] == "NXBGW-01"
-    # carrier A: A-BGW-01 <-> B-BGW-01 in site A's 10.x.246.0/31; carrier B: B-BGW-02 <-> A-BGW-02 in site B's
-    if first:
-        carrier, net_o = "A", SITES[A()]["o"]
-        mine = 0 if site == A() else 1
-    else:
-        carrier, net_o = "B", SITES[B()]["o"]
-        mine = 0 if site == B() else 1
-    dci_me, dci_peer = f"10.{net_o}.246.{mine}", f"10.{net_o}.246.{1 - mine}"
-    remote_bgw = host(peer, me[1])
+    dci = bgw_dci(site, me[1])
+    dci_if = "\n".join(f"""interface {port}
+  description DCI carrier {carrier} to {host(rs, rb)}
+  no switchport
+  mtu 9216                         ! set to the carrier's maximum if lower
+  no ip redirects
+  ip address {ip}/31
+  evpn multisite dci-tracking
+  no shutdown""" for carrier, port, ip, rs, rb, _ in dci)
+    dci_nbr = "\n".join(f"""  ! DCI underlay (carrier {carrier})
+  neighbor {rip}
+    remote-as {dev_asn(rs, rb)}
+    description {host(rs, rb)} underlay (carrier {carrier})
+    bfd
+    address-family ipv4 unicast
+      route-map RM-DCI-UL-IN in
+      route-map RM-DCI-UL-OUT out""" for carrier, _, _, rs, rb, rip in dci)
     aws_net, aws_me, aws_peer, az_net, az_me, az_peer, (dx_conn, er_link) = cloud_links(site, me[1])
     pl_aws = "\n".join(f"ip prefix-list PL-CLOUD-AWS seq {10 * (i + 1)} permit {n} le 24" for i, n in enumerate(CLOUD_AWS))
     pl_az = "\n".join(f"ip prefix-list PL-CLOUD-AZURE seq {10 * (i + 1)} permit {n} le 24" for i, n in enumerate(CLOUD_AZURE))
@@ -842,14 +896,7 @@ interface Ethernet1/50
   evpn multisite fabric-tracking
   no shutdown
 
-interface Ethernet1/51
-  description DCI carrier {carrier} to {remote_bgw}
-  no switchport
-  mtu 9216                         ! set to the carrier's maximum if lower
-  no ip redirects
-  ip address {dci_me}/31
-  evpn multisite dci-tracking
-  no shutdown
+{dci_if}
 
 ! ---- day-one cloud handoff (VRF TRUST) --------------------------------
 interface Ethernet1/52
@@ -973,14 +1020,7 @@ router bgp {asn}
     address-family l2vpn evpn
       send-community
       send-community extended
-  ! DCI underlay (carrier {carrier})
-  neighbor {dci_peer}
-    remote-as {dev_asn(peer, me[1])}
-    description {remote_bgw} underlay
-    bfd
-    address-family ipv4 unicast
-      route-map RM-DCI-UL-IN in
-      route-map RM-DCI-UL-OUT out
+{dci_nbr}
   ! DCI overlay to both remote BGWs
   neighbor 10.{po}.240.21
     remote-as {dev_asn(peer, 'NXBGW-01')}
@@ -1164,12 +1204,22 @@ def topology_svg():
     lvd, lbx, lby = site_svg(A(), 20)
     sac, sbx, sby = site_svg(B(), 720)
     dci = []
-    for i in range(2):
-        y = lby[i] + 28
-        dci.append(f'<line x1="{lbx + 160}" y1="{y}" x2="{sbx}" y2="{y}" class="dci"/>')
-    dci.append('<text x="700" y="660" class="ann">L3 DCI</text>')
-    dci.append(f'<text x="700" y="{lby[0] + 22}" class="ann small">A</text>')
-    dci.append(f'<text x="700" y="{lby[1] + 22}" class="ann small">B</text>')
+    row = {"NXBGW-01": 0, "NXBGW-02": 1}
+    for link in dci_links():
+        (s1, b1, _), (s2, b2, _) = link["ends"]
+        ya, yb = (lby[row[b1]], sby[row[b2]]) if s1 == A() else (lby[row[b2]], sby[row[b1]])
+        dash = ' stroke-dasharray="8 5"' if link["carrier"] == "B" else ""
+        dci.append(f'<line x1="{lbx + 160}" y1="{ya + 28}" x2="{sbx}" y2="{yb + 28}" class="dci"{dash}/>')
+    if DCI_MODE == "full-mesh":
+        # straight circuits are carrier A; carrier B crosses over (dashed)
+        dci.append('<text x="700" y="580" class="ann">L3 DCI</text>')
+        dci.append(f'<text x="700" y="{lby[0] + 22}" class="ann small">A</text>')
+        dci.append(f'<text x="700" y="{lby[1] + 22}" class="ann small">A</text>')
+        dci.append('<text x="700" y="762" class="ann small">B: dashed, crossed</text>')
+    else:
+        dci.append('<text x="700" y="660" class="ann">L3 DCI</text>')
+        dci.append(f'<text x="700" y="{lby[0] + 22}" class="ann small">A</text>')
+        dci.append(f'<text x="700" y="{lby[1] + 22}" class="ann small">B</text>')
     dci.append('<text x="700" y="790" class="ann">eBGP between BGWs: IPv4 (BGW loopbacks) + L2VPN EVPN (VRF TRUST type-5: site /16 + approved cloud prefixes)</text>')
     legend = ('<g class="legend">'
               '<line x1="40" y1="815" x2="80" y2="815" class="ul"/><text x="88" y="819">eBGP underlay /31 + MP-BGP EVPN (eBGP, loopbacks)</text>'
@@ -1202,12 +1252,12 @@ def build():
     sec.append(("decisions", "4. Design decisions", table(["#", "Area", "Decision", "Why", "Status"], d["decisions"], "dec")
                 + "<h3>Cisco best-practice alignment</h3>" + table(["Practice", "In this design", "Where"], d["best_practice"])))
 
-    dci_rows = [
-        ["Carrier A", host(a, "NXBGW-01") + " Eth1/51 " + mono(f"10.{oa}.246.0/31"),
-         host(b, "NXBGW-01") + " Eth1/51 " + mono(f"10.{oa}.246.1/31"), f"{a} owns the addressing"],
-        ["Carrier B", host(b, "NXBGW-02") + " Eth1/51 " + mono(f"10.{ob}.246.0/31"),
-         host(a, "NXBGW-02") + " Eth1/51 " + mono(f"10.{ob}.246.1/31"), f"{b} owns the addressing"],
-    ]
+    dci_rows = []
+    for link in dci_links():
+        port = "Eth" + link["port"][len("Ethernet"):]
+        (s1, b1, ip1), (s2, b2, ip2) = link["ends"]
+        dci_rows.append([f"Carrier {link['carrier']}", host(s1, b1) + f" {port} " + mono(f"{ip1}/31"),
+                         host(s2, b2) + f" {port} " + mono(f"{ip2}/31"), f"{s1} owns the addressing"])
     dev_h = ["Hostname", "Role", "Lo0 / router-ID", "Lo1 / VTEP", "Shared addresses", "mgmt0 (OOB)", "AS"]
     p2p_h = ["Spine", "Port", "Spine IP", "Peer", "Port", "Peer IP"]
     sec.append(("addressing", "5. Infrastructure addressing", f"""
@@ -1262,7 +1312,10 @@ def build():
         ["Multi-Site site ID", str(SITES[a]["site_id"]), str(SITES[b]["site_id"])],
         ["BGW Multi-Site VIP (loopback100)", mono(f"10.{oa}.241.{BGW_VIP}/32"), mono(f"10.{ob}.241.{BGW_VIP}/32")],
         ["BGW Lo0", mono(f"10.{oa}.240.21/.22"), mono(f"10.{ob}.240.21/.22")],
-        ["DCI underlay", f"eBGP to {b} over carrier A (BGW-01) and B (BGW-02)", f"eBGP to {a} over carrier A (BGW-01) and B (BGW-02)"],
+        (["DCI underlay", f"Full mesh: every BGW has one circuit on each carrier, to a different {b} BGW",
+          f"Full mesh: every BGW has one circuit on each carrier, to a different {a} BGW"]
+         if DCI_MODE == "full-mesh" else
+         ["DCI underlay", f"eBGP to {b} over carrier A (BGW-01) and B (BGW-02)", f"eBGP to {a} over carrier A (BGW-01) and B (BGW-02)"]),
         ["DCI overlay", f"eBGP EVPN multihop, Lo0 to both {b} BGWs, peer-type fabric-external", f"Same, toward the {a} BGWs"],
         ["Advertised over DCI", f"Type-5 routes in 10.{oa}.0.0/16, AWS/Azure prefixes learned at {a}, BGW loopbacks",
          f"Type-5 routes in 10.{ob}.0.0/16, AWS/Azure prefixes learned at {b}, BGW loopbacks"],

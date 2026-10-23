@@ -20,12 +20,20 @@ DEMO = ROOT / "examples" / "demo-fabric.json"
 
 
 class FabricConsistencyTest(unittest.TestCase):
+    """Runs against the demo data as committed (full-mesh DCI)."""
+
+    dci_mode = None     # None: as in the demo file; subclasses override
+
     @classmethod
     def setUpClass(cls):
         cls.data = json.loads(DEMO.read_text())
+        if cls.dci_mode:
+            cls.data["dci"] = {"mode": cls.dci_mode}
         cls.tmp = tempfile.TemporaryDirectory()
         out = Path(cls.tmp.name)
-        build.main([str(DEMO), "--out", str(out)])
+        src = out / "input.json"
+        src.write_text(json.dumps(cls.data))
+        build.main([str(src), "--out", str(out)])
         cls.cfg = {f.stem: Config(f.stem, f.read_text()) for f in sorted((out / "configs").glob("*.cfg"))}
         cls.panos = {f.name.split("-FW")[0]: f.read_text() for f in (out / "configs").glob("*.panos.txt")}
         cls.sites = {s["code"]: s for s in cls.data["sites"]}
@@ -49,6 +57,29 @@ class FabricConsistencyTest(unittest.TestCase):
 
     def vteps(self, site=None):
         return self.role_devs("NXLF", site) + self.role_devs("NXBGW", site)
+
+    @staticmethod
+    def is_dci(c, ifname):
+        node = c.interfaces.get(ifname)
+        return node is not None and node.find("evpn multisite dci-tracking") != []
+
+    def dci_links(self):
+        """[(carrier, (bgw, ifname, ip_interface), (bgw, ifname, ip_interface))], read from the configs."""
+        ends = collections.defaultdict(list)
+        for c in self.role_devs("NXBGW"):
+            for ifname, node in c.interfaces.items():
+                if self.is_dci(c, ifname):
+                    m = re.fullmatch(r"DCI carrier (\S+) to (\S+)", node.values("description")[0])
+                    addr = ipaddress.ip_interface(node.values("ip address")[0])
+                    ends[addr.network].append((m.group(1), m.group(2), c.name, ifname, addr))
+        links = []
+        for net, e in sorted(ends.items(), key=lambda kv: int(kv[0].network_address)):
+            self.assertEqual(len(e), 2, f"DCI {net} has {len(e)} ends")
+            (ca, fa, na, ia, aa), (cb, fb, nb, ib, ab) = e
+            self.assertEqual(ca, cb, f"DCI {net}: carrier {ca} vs {cb}")
+            self.assertEqual((fa, fb), (nb, na), f"DCI {net}: descriptions do not name each other")
+            links.append((ca, (na, ia, aa), (nb, ib, ab)))
+        return links
 
     def vpc_pairs(self):
         for site in self.sites:
@@ -105,7 +136,7 @@ class FabricConsistencyTest(unittest.TestCase):
                     if addr.ip in block:
                         continue
                     in_dci = any(addr.ip in ipaddress.ip_network(n) for n in dci)
-                    self.assertTrue(in_dci and ifname == "Ethernet1/51", f"{c.name} {ifname} {addr}")
+                    self.assertTrue(in_dci and self.is_dci(c, ifname), f"{c.name} {ifname} {addr}")
 
     def test_infrastructure_stays_inside_the_infra_block(self):
         """Only host and legacy-core SVIs (and the other site's DCI /31) sit outside 10.x.240.0/21."""
@@ -119,7 +150,7 @@ class FabricConsistencyTest(unittest.TestCase):
                 for ifname, addr, _, _ in c.addresses():
                     if ifname in host_svis or ifname == f"Vlan{legacy}":
                         self.assertNotIn(addr.ip, infra, f"{c.name} {ifname} {addr} collides with infra")
-                    elif not (ifname == "Ethernet1/51" and addr.ip not in ipaddress.ip_network(f"10.{s['octet']}.0.0/16")):
+                    elif not (self.is_dci(c, ifname) and addr.ip not in ipaddress.ip_network(f"10.{s['octet']}.0.0/16")):
                         self.assertIn(addr.ip, infra, f"{c.name} {ifname} {addr}")
 
     def test_underlay_links_agree_on_both_ends(self):
@@ -147,18 +178,63 @@ class FabricConsistencyTest(unittest.TestCase):
                 checked += 1
         self.assertEqual(checked, 2 * 2 * 2 * 6)  # 2 sites x 2 spines x 6 downstream, both ends
 
-    def test_dci_links_pair_the_matching_bgws(self):
-        for c in self.role_devs("NXBGW"):
-            node = c.interfaces["Ethernet1/51"]
-            desc = node.values("description")[0]
-            remote = desc.split(" to ")[1]
-            self.assertTrue(remote.endswith(c.name[-8:]), f"{c.name}: {desc}")
-            far = self.cfg[remote]
-            a = ipaddress.ip_interface(node.values("ip address")[0])
-            b = ipaddress.ip_interface(far.interfaces["Ethernet1/51"].values("ip address")[0])
-            self.assertEqual(a.network, b.network)
-            self.assertNotEqual(a.ip, b.ip)
-            self.assertIn("evpn multisite dci-tracking", [x.line for x in node.children])
+    def test_dci_links_join_bgws_of_different_sites(self):
+        links = self.dci_links()
+        expect = {"pair": 2, "full-mesh": 4}[build.DCI_MODE]
+        self.assertEqual(len(links), expect)
+        owners = {f"10.{s['octet']}.246.0/24": code for code, s in self.sites.items()}
+        for carrier, (na, ia, aa), (nb, ib, ab) in links:
+            self.assertNotEqual(na.split("-")[0], nb.split("-")[0], f"{na}-{nb}")
+            self.assertEqual(aa.network.prefixlen, 31)
+            self.assertNotEqual(aa.ip, ab.ip)
+            # carrier A is addressed from the first site's /16, carrier B from the second's
+            owner = next(code for blk, code in owners.items() if aa.ip in ipaddress.ip_network(blk))
+            self.assertEqual(owner, build.SITE_ORDER["AB".index(carrier)], f"{na}-{nb}")
+            for me, far, far_ip in ((na, nb, ab.ip), (nb, na, aa.ip)):
+                n = [x for vrf, ip, x in self.cfg[me].neighbors() if ip == str(far_ip)]
+                self.assertEqual(len(n), 1, f"{me} has no DCI underlay session to {far}")
+                self.assertEqual(n[0].values("remote-as"), [str(self.cfg[far].asn)])
+                self.assertTrue(n[0].find("bfd"))
+                rms = {(rm, d) for nbr, rm, d in self.cfg[me].neighbor_route_maps() if nbr == str(far_ip)}
+                self.assertEqual(rms, {("RM-DCI-UL-IN", "in"), ("RM-DCI-UL-OUT", "out")}, me)
+
+    def test_full_mesh_gives_every_bgw_one_circuit_per_carrier(self):
+        if build.DCI_MODE != "full-mesh":
+            self.skipTest("pair mode")
+        per_bgw = collections.defaultdict(list)
+        pairs = set()
+        for carrier, (na, ia, _), (nb, ib, _) in self.dci_links():
+            per_bgw[na].append((carrier, nb, ia))
+            per_bgw[nb].append((carrier, na, ib))
+            pairs.add(frozenset((na, nb)))
+        self.assertEqual(len(pairs), 4, "every BGW pair across the sites is joined once")
+        for bgw, links in per_bgw.items():
+            self.assertEqual(sorted(c for c, _, _ in links), ["A", "B"], bgw)
+            self.assertEqual(len({far for _, far, _ in links}), 2, f"{bgw}: both circuits go to the same BGW")
+            self.assertEqual(len({i for _, _, i in links}), 2, f"{bgw}: both circuits on one port")
+
+    def test_single_failure_isolates_no_surviving_bgw(self):
+        """Fail each carrier, each circuit and each BGW in turn; every BGW left in service must keep a DCI
+        circuit to a BGW that is also in service. Pair mode is expected to fail this (a carrier or BGW loss
+        cuts its partner off), full mesh to pass it."""
+        links = self.dci_links()
+        bgws = [c.name for c in self.role_devs("NXBGW")]
+        failures = [("carrier", c) for c in "AB"] + [("circuit", i) for i in range(len(links))] + [("bgw", b) for b in bgws]
+        isolated = []
+        for kind, what in failures:
+            down_bgw = {what} if kind == "bgw" else set()
+            up = [l for i, l in enumerate(links)
+                  if not (kind == "carrier" and l[0] == what) and not (kind == "circuit" and i == what)
+                  and l[1][0] not in down_bgw and l[2][0] not in down_bgw]
+            for b in bgws:
+                if b in down_bgw:
+                    continue
+                if not any(b in (l[1][0], l[2][0]) for l in up):
+                    isolated.append(f"{kind} {what} isolates {b}")
+        if build.DCI_MODE == "full-mesh":
+            self.assertEqual(isolated, [])
+        else:
+            self.assertNotEqual(isolated, [], "pair mode was expected to have single points of isolation")
 
     def test_bgp_network_statements_are_local_addresses(self):
         for c in self.cfg.values():
@@ -404,6 +480,12 @@ class FabricConsistencyTest(unittest.TestCase):
                 self.assertTrue(all(d.endswith(port) for d in fw_ports), f"{name}: {fw_ports} vs {port}")
             accepted = set(re.findall(r"policy import rules SITE-PREFIXES .*match address-prefix (\S+)", text))
             self.assertEqual(accepted, {f"10.{s['octet']}.0.0/16" for s in self.sites.values()}, site)
+
+
+class PairDciConsistencyTest(FabricConsistencyTest):
+    """The same checks with the original one-circuit-per-BGW DCI."""
+
+    dci_mode = "pair"
 
 
 if __name__ == "__main__":

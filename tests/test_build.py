@@ -86,7 +86,7 @@ class DemoFabricTest(unittest.TestCase):
             a = ip.split(".")
             if a[2] in ("242", "246"):
                 links[(a[1], a[2], int(a[3]) // 2)] |= devs
-        self.assertEqual(len(links), 26)
+        self.assertEqual(len(links), 2 * 2 * 6 + len(build.dci_links()))
         for key, devs in links.items():
             self.assertEqual(len(devs), 2, key)
 
