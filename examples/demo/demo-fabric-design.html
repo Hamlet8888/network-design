@@ -1,0 +1,4435 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DC1–DC2 EVPN Multi-Site Design (demo)</title>
+<style>
+:root{--bg:#f7f8fa;--surface:#fff;--ink:#1a1f2b;--muted:#5b6474;--line:#dde2ea;--accent:#2457c5;--code:#f1f3f7;
+--spine:#e8f0ff;--spine-b:#5b7fd6;--leaf:#e9f7ef;--leaf-b:#3c9a63;--bgw:#fff1e6;--bgw-b:#d1782f;--fw:#fdecec;--fw-b:#c94a4a;
+--ul:#3c9a63;--fwl:#9a5ad1;--dci:#d1782f;--warn:#fff7e0;--warn-b:#e0b84c;--cloud:#e8f4fb;--cloud-b:#2b8cbe}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#11141a;--surface:#181c24;--ink:#e6e9ef;--muted:#9aa3b2;--line:#2b313d;--accent:#7ea2ff;--code:#1f2430;
+--spine:#1c2740;--spine-b:#7ea2ff;--leaf:#16291f;--leaf-b:#5cc48a;--bgw:#2e2116;--bgw-b:#f0a060;--fw:#2e1a1a;--fw-b:#f07a7a;--ul:#5cc48a;--fwl:#c08cf0;--dci:#f0a060;--warn:#2b2614;--warn-b:#a88a35;--cloud:#14242e;--cloud-b:#5fb4e0}}
+:root[data-theme="dark"]{--bg:#11141a;--surface:#181c24;--ink:#e6e9ef;--muted:#9aa3b2;--line:#2b313d;--accent:#7ea2ff;--code:#1f2430;
+--spine:#1c2740;--spine-b:#7ea2ff;--leaf:#16291f;--leaf-b:#5cc48a;--bgw:#2e2116;--bgw-b:#f0a060;--fw:#2e1a1a;--fw-b:#f07a7a;--ul:#5cc48a;--fwl:#c08cf0;--dci:#f0a060;--warn:#2b2614;--warn-b:#a88a35;--cloud:#14242e;--cloud-b:#5fb4e0}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif}
+header{padding:32px 16px 20px;max-width:1180px;margin:0 auto}
+h1{font-size:26px;margin:0 0 6px}
+.sub{color:var(--muted);margin:0}
+.badge{display:inline-block;margin-top:10px;padding:3px 10px;border-radius:999px;background:var(--warn);border:1px solid var(--warn-b);font-size:12.5px}
+nav{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line);padding:8px 16px;overflow-x:auto;white-space:nowrap}
+nav a{color:var(--muted);text-decoration:none;margin-right:16px;font-size:13.5px}
+nav a:hover{color:var(--accent)}
+main{max-width:1180px;margin:0 auto;padding:0 16px 60px}
+section{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px;margin:22px 0}
+h2{font-size:20px;margin:0 0 12px}
+h3{font-size:15.5px;margin:22px 0 8px}
+ul{padding-left:20px}li{margin:4px 0}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.8px;background:var(--code);padding:1px 4px;border-radius:4px;white-space:nowrap}
+pre{background:var(--code);border:1px solid var(--line);border-radius:8px;padding:14px;overflow-x:auto;font-size:12.5px;line-height:1.45}
+pre code{background:none;padding:0;white-space:pre}
+.tw{overflow-x:auto;margin:8px 0 4px}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th,td{border-bottom:1px solid var(--line);padding:7px 9px;text-align:left;vertical-align:top}
+th{color:var(--muted);font-weight:600;font-size:12.5px;text-transform:uppercase;letter-spacing:.03em}
+table.compact td{padding:4px 9px}
+table.dec td:last-child{white-space:nowrap;font-weight:600}
+.note{background:var(--warn);border:1px solid var(--warn-b);border-radius:8px;padding:10px 14px;margin:12px 0;font-size:14px}
+.small{font-size:12.5px;color:var(--muted)}
+details{border:1px solid var(--line);border-radius:8px;margin:8px 0;padding:0 12px}
+summary{cursor:pointer;padding:10px 0;font-weight:600}
+figure{margin:0}
+figcaption{color:var(--muted);font-size:13px;margin-top:6px}
+svg.topo{width:100%;height:auto;display:block}
+.panel{fill:none;stroke:var(--line);stroke-width:1.5}
+.pt{fill:var(--ink);font-weight:700;font-size:15px}
+.ps{fill:var(--muted);font-size:12px}
+.node rect{stroke-width:1.5}
+.node.spine rect{fill:var(--spine);stroke:var(--spine-b)}
+.node.leaf rect{fill:var(--leaf);stroke:var(--leaf-b)}
+.node.bgw rect{fill:var(--bgw);stroke:var(--bgw-b)}
+.node.fw rect{fill:var(--fw);stroke:var(--fw-b)}
+.node.cloud rect{fill:var(--cloud);stroke:var(--cloud-b)}
+.cl{stroke:var(--cloud-b);stroke-width:1.6}
+.nt{fill:var(--ink);font-weight:700;font-size:11.5px;text-anchor:middle}
+.ns{fill:var(--muted);font-size:10.5px;text-anchor:middle;font-family:ui-monospace,Menlo,monospace}
+.ann{fill:var(--muted);font-size:11px;text-anchor:middle}
+.ann.end{text-anchor:end}
+.ann.small{font-weight:700;fill:var(--dci)}
+.ul{stroke:var(--ul);stroke-width:1.2;opacity:.75}
+.ul.faint{opacity:.35}
+.fwl{stroke:var(--fwl);stroke-width:1.4;stroke-dasharray:5 4}
+.dci{stroke:var(--dci);stroke-width:3}
+.ha{stroke:var(--fw-b);stroke-width:2;stroke-dasharray:2 3}
+.legend text{fill:var(--muted);font-size:12px}
+footer{max-width:1180px;margin:0 auto;padding:0 16px 40px;color:var(--muted);font-size:12.5px}
+@media print{nav{display:none}section{break-inside:avoid-page;border:none}details{border:none}details>*{display:block}body{background:#fff}}
+</style></head>
+<body>
+<header>
+<h1>DC1–DC2 Nexus EVPN/VXLAN Multi-Site Fabric Design (demo)</h1>
+<p class="sub">Fictional example · two data centers · generated by fabric_design</p>
+<span class="badge">Fictional demo data: no real addresses, names or circuits.</span>
+</header>
+<nav><a href="#summary">1. Summary</a><a href="#current">2. What exists today</a><a href="#topology">3. Target topology</a><a href="#decisions">4. Design decisions</a><a href="#addressing">5. Infrastructure addressing</a><a href="#tenants">6. VLAN, VNI and VRF matrix</a><a href="#firewall">7. Firewall integration</a><a href="#multisite">8. Multi-Site, DCI and cloud</a><a href="#configs">9. NX-OS configuration templates</a><a href="#migration">10. Migration from the legacy core</a><a href="#tests">11. Failure test matrix</a><a href="#open">12. Open items before implementation</a></nav>
+<main><section id="summary"><h2>1. Summary</h2>
+<p>Two independent Nexus EVPN/VXLAN fabrics, one per data center, joined by dedicated Multi-Site border gateways over a redundant routed DCI. Each site has 2 × Nexus 9500 spines (EVPN route servers), 4 × Nexus 9300 leafs in two vPC pairs and 2 × Nexus 9300 BGWs, with a Palo Alto HA pair at the north-south edge.</p>
+<p><b>BGP only:</b> eBGP IPv4 underlay on the /31 links, MP-BGP L2VPN EVPN overlay (eBGP between loopbacks), eBGP to the firewalls, across the DCI and to AWS/Azure. BFD on every session.</p>
+<ul>
+<li><b>Each site keeps all infrastructure inside its own /16</b> (<code>10.110.0.0/16</code> for DC1, <code>10.120.0.0/16</code> for DC2), in the 10.x.240.0/21 block.</li>
+<li><b>Only routed traffic crosses the DCI.</b> Each site has its own L2VNIs; nothing is stretched by default.</li>
+<li><b>AWS Direct Connect and Azure ExpressRoute</b> terminate on the BGWs in VRF TRUST at both sites.</li>
+</ul>
+</section><section id="current"><h2>2. What exists today</h2>
+<p>The demo assumes a typical starting point: a legacy core per site, routed to an HA firewall pair.</p>
+<div class="tw"><table class=""><thead><tr><th></th><th>DC1</th><th>DC2</th></tr></thead><tbody><tr><td>Site supernet</td><td><code>10.110.0.0/16</code></td><td><code>10.120.0.0/16</code></td></tr><tr><td>Firewalls</td><td>DC1-FW-01 / DC1-FW-02 (HA A/P)</td><td>DC2-FW-01 / DC2-FW-02 (HA A/P)</td></tr><tr><td>Firewall to core</td><td>ae8 <code>10.110.99.100/24</code>, OSPF</td><td>ae8 <code>10.120.99.100/24</code>, OSPF</td></tr><tr><td>DC1↔DC2 today</td><td>IPsec over the internet</td><td>IPsec over the internet</td></tr></tbody></table></div>
+<p>VLAN N uses 10.110.N.0/24 at DC1 and 10.120.N.0/24 at DC2. The VNI numbering builds on it (§6).</p>
+</section><section id="topology"><h2>3. Target topology</h2>
+<figure><svg viewBox="0 0 1400 835" role="img" aria-label="DC1 and DC2 EVPN Multi-Site topology" class="topo"><rect x="20" y="50" width="660" height="715" rx="14" class="panel"/><text x="38" y="78" class="pt">DC1 · Example City A (Example colo)</text><text x="38" y="96" class="ps">10.110.0.0/16 · AS 65110 · Multi-Site ID 110</text><g class="node fw"><rect x="220" y="115" width="140" height="52" rx="8"/><text x="290.0" y="132" class="nt">DC1-FW-01</text><text x="290.0" y="148" class="ns">Palo Alto HA A/P</text><text x="290.0" y="162" class="ns">eBGP AS 65217</text></g><g class="node fw"><rect x="390" y="115" width="140" height="52" rx="8"/><text x="460.0" y="132" class="nt">DC1-FW-02</text><text x="460.0" y="148" class="ns">Palo Alto HA A/P</text><text x="460.0" y="162" class="ns">eBGP AS 65217</text></g><line x1="360" y1="141" x2="390" y2="141" class="ha"/><g class="node spine"><rect x="140" y="235" width="150" height="56" rx="8"/><text x="215.0" y="252" class="nt">DC1-NXSP-01</text><text x="215.0" y="268" class="ns">Nexus 9500 · AS 65210</text><text x="215.0" y="282" class="ns">Lo0 10.110.240.1</text></g><g class="node spine"><rect x="410" y="235" width="150" height="56" rx="8"/><text x="485.0" y="252" class="nt">DC1-NXSP-02</text><text x="485.0" y="268" class="ns">Nexus 9500 · AS 65210</text><text x="485.0" y="282" class="ns">Lo0 10.110.240.2</text></g><g class="node leaf"><rect x="35" y="415" width="141" height="70" rx="8"/><text x="105.5" y="432" class="nt">DC1-NXLF-01</text><text x="105.5" y="448" class="ns">Nexus 9300 leaf</text><text x="105.5" y="462" class="ns">Lo0 10.110.240.11</text><text x="105.5" y="476" class="ns">Lo1 10.110.241.11</text></g><g class="node leaf"><rect x="198" y="415" width="141" height="70" rx="8"/><text x="268.5" y="432" class="nt">DC1-NXLF-02</text><text x="268.5" y="448" class="ns">Nexus 9300 leaf</text><text x="268.5" y="462" class="ns">Lo0 10.110.240.12</text><text x="268.5" y="476" class="ns">Lo1 10.110.241.12</text></g><g class="node leaf"><rect x="361" y="415" width="141" height="70" rx="8"/><text x="431.5" y="432" class="nt">DC1-NXLF-03</text><text x="431.5" y="448" class="ns">Border-service leaf</text><text x="431.5" y="462" class="ns">Lo0 10.110.240.13</text><text x="431.5" y="476" class="ns">Lo1 10.110.241.13</text></g><g class="node leaf"><rect x="524" y="415" width="141" height="70" rx="8"/><text x="594.5" y="432" class="nt">DC1-NXLF-04</text><text x="594.5" y="448" class="ns">Border-service leaf</text><text x="594.5" y="462" class="ns">Lo0 10.110.240.14</text><text x="594.5" y="476" class="ns">Lo1 10.110.241.14</text></g><text x="187.0" y="506" class="ann">vPC 111 · VTEP VIP 10.110.241.101</text><text x="513.0" y="506" class="ann">vPC 112 · VTEP VIP 10.110.241.102</text><g class="node bgw"><rect x="505" y="590" width="160" height="56" rx="8"/><text x="585.0" y="607" class="nt">DC1-NXBGW-01</text><text x="585.0" y="623" class="ns">Multi-Site BGW</text><text x="585.0" y="637" class="ns">Lo0 10.110.240.21</text></g><g class="node bgw"><rect x="505" y="668" width="160" height="56" rx="8"/><text x="585.0" y="685" class="nt">DC1-NXBGW-02</text><text x="585.0" y="701" class="ns">Multi-Site BGW</text><text x="585.0" y="715" class="ns">Lo0 10.110.240.22</text></g><text x="585" y="744" class="ann">Multi-Site VIP 10.110.241.200</text><g class="node cloud"><rect x="270" y="597" width="170" height="44" rx="8"/><text x="355.0" y="614" class="nt">AWS Direct Connect</text><text x="355.0" y="630" class="ns">private VIF · 10.110.244.0/28</text></g><line x1="440" y1="619" x2="505" y2="618" class="cl"/><line x1="440" y1="619" x2="505" y2="696" class="cl"/><g class="node cloud"><rect x="270" y="675" width="170" height="44" rx="8"/><text x="355.0" y="692" class="nt">Azure ExpressRoute</text><text x="355.0" y="708" class="ns">private peering · 10.110.244.16/29</text></g><line x1="440" y1="697" x2="505" y2="618" class="cl"/><line x1="440" y1="697" x2="505" y2="696" class="cl"/><text x="355" y="590" class="ann">eBGP in VRF TRUST (day one)</text><line x1="215" y1="291" x2="105" y2="415" class="ul"/><line x1="215" y1="291" x2="268" y2="415" class="ul"/><line x1="215" y1="291" x2="431" y2="415" class="ul"/><line x1="215" y1="291" x2="594" y2="415" class="ul"/><line x1="215" y1="291" x2="585" y2="590" class="ul faint"/><line x1="215" y1="291" x2="585" y2="668" class="ul faint"/><line x1="485" y1="291" x2="105" y2="415" class="ul"/><line x1="485" y1="291" x2="268" y2="415" class="ul"/><line x1="485" y1="291" x2="431" y2="415" class="ul"/><line x1="485" y1="291" x2="594" y2="415" class="ul"/><line x1="485" y1="291" x2="585" y2="590" class="ul faint"/><line x1="485" y1="291" x2="585" y2="668" class="ul faint"/><line x1="290" y1="167" x2="431" y2="415" class="fwl"/><line x1="290" y1="167" x2="594" y2="415" class="fwl"/><line x1="460" y1="167" x2="431" y2="415" class="fwl"/><line x1="460" y1="167" x2="594" y2="415" class="fwl"/><text x="660" y="205" class="ann end">e1/24→LF-03 · e1/26→LF-04 · 10.110.244.64/28 · eBGP</text><text x="360" y="40" class="ann">Internet / ISPs / IPsec mesh (unchanged)</text><line x1="290" y1="46" x2="290" y2="115" class="fwl"/><line x1="460" y1="46" x2="460" y2="115" class="fwl"/><rect x="720" y="50" width="660" height="715" rx="14" class="panel"/><text x="738" y="78" class="pt">DC2 · Example City B (Example colo)</text><text x="738" y="96" class="ps">10.120.0.0/16 · AS 65120 · Multi-Site ID 120</text><g class="node fw"><rect x="920" y="115" width="140" height="52" rx="8"/><text x="990.0" y="132" class="nt">DC2-FW-01</text><text x="990.0" y="148" class="ns">Palo Alto HA A/P</text><text x="990.0" y="162" class="ns">eBGP AS 65227</text></g><g class="node fw"><rect x="1090" y="115" width="140" height="52" rx="8"/><text x="1160.0" y="132" class="nt">DC2-FW-02</text><text x="1160.0" y="148" class="ns">Palo Alto HA A/P</text><text x="1160.0" y="162" class="ns">eBGP AS 65227</text></g><line x1="1060" y1="141" x2="1090" y2="141" class="ha"/><g class="node spine"><rect x="840" y="235" width="150" height="56" rx="8"/><text x="915.0" y="252" class="nt">DC2-NXSP-01</text><text x="915.0" y="268" class="ns">Nexus 9500 · AS 65220</text><text x="915.0" y="282" class="ns">Lo0 10.120.240.1</text></g><g class="node spine"><rect x="1110" y="235" width="150" height="56" rx="8"/><text x="1185.0" y="252" class="nt">DC2-NXSP-02</text><text x="1185.0" y="268" class="ns">Nexus 9500 · AS 65220</text><text x="1185.0" y="282" class="ns">Lo0 10.120.240.2</text></g><g class="node leaf"><rect x="735" y="415" width="141" height="70" rx="8"/><text x="805.5" y="432" class="nt">DC2-NXLF-01</text><text x="805.5" y="448" class="ns">Nexus 9300 leaf</text><text x="805.5" y="462" class="ns">Lo0 10.120.240.11</text><text x="805.5" y="476" class="ns">Lo1 10.120.241.11</text></g><g class="node leaf"><rect x="898" y="415" width="141" height="70" rx="8"/><text x="968.5" y="432" class="nt">DC2-NXLF-02</text><text x="968.5" y="448" class="ns">Nexus 9300 leaf</text><text x="968.5" y="462" class="ns">Lo0 10.120.240.12</text><text x="968.5" y="476" class="ns">Lo1 10.120.241.12</text></g><g class="node leaf"><rect x="1061" y="415" width="141" height="70" rx="8"/><text x="1131.5" y="432" class="nt">DC2-NXLF-03</text><text x="1131.5" y="448" class="ns">Border-service leaf</text><text x="1131.5" y="462" class="ns">Lo0 10.120.240.13</text><text x="1131.5" y="476" class="ns">Lo1 10.120.241.13</text></g><g class="node leaf"><rect x="1224" y="415" width="141" height="70" rx="8"/><text x="1294.5" y="432" class="nt">DC2-NXLF-04</text><text x="1294.5" y="448" class="ns">Border-service leaf</text><text x="1294.5" y="462" class="ns">Lo0 10.120.240.14</text><text x="1294.5" y="476" class="ns">Lo1 10.120.241.14</text></g><text x="887.0" y="506" class="ann">vPC 121 · VTEP VIP 10.120.241.101</text><text x="1213.0" y="506" class="ann">vPC 122 · VTEP VIP 10.120.241.102</text><g class="node bgw"><rect x="735" y="590" width="160" height="56" rx="8"/><text x="815.0" y="607" class="nt">DC2-NXBGW-01</text><text x="815.0" y="623" class="ns">Multi-Site BGW</text><text x="815.0" y="637" class="ns">Lo0 10.120.240.21</text></g><g class="node bgw"><rect x="735" y="668" width="160" height="56" rx="8"/><text x="815.0" y="685" class="nt">DC2-NXBGW-02</text><text x="815.0" y="701" class="ns">Multi-Site BGW</text><text x="815.0" y="715" class="ns">Lo0 10.120.240.22</text></g><text x="815" y="744" class="ann">Multi-Site VIP 10.120.241.200</text><g class="node cloud"><rect x="970" y="597" width="170" height="44" rx="8"/><text x="1055.0" y="614" class="nt">AWS Direct Connect</text><text x="1055.0" y="630" class="ns">private VIF · 10.120.244.0/28</text></g><line x1="970" y1="619" x2="895" y2="618" class="cl"/><line x1="970" y1="619" x2="895" y2="696" class="cl"/><g class="node cloud"><rect x="970" y="675" width="170" height="44" rx="8"/><text x="1055.0" y="692" class="nt">Azure ExpressRoute</text><text x="1055.0" y="708" class="ns">private peering · 10.120.244.16/29</text></g><line x1="970" y1="697" x2="895" y2="618" class="cl"/><line x1="970" y1="697" x2="895" y2="696" class="cl"/><text x="1055" y="590" class="ann">eBGP in VRF TRUST (day one)</text><line x1="915" y1="291" x2="805" y2="415" class="ul"/><line x1="915" y1="291" x2="968" y2="415" class="ul"/><line x1="915" y1="291" x2="1131" y2="415" class="ul"/><line x1="915" y1="291" x2="1294" y2="415" class="ul"/><line x1="915" y1="291" x2="815" y2="590" class="ul faint"/><line x1="915" y1="291" x2="815" y2="668" class="ul faint"/><line x1="1185" y1="291" x2="805" y2="415" class="ul"/><line x1="1185" y1="291" x2="968" y2="415" class="ul"/><line x1="1185" y1="291" x2="1131" y2="415" class="ul"/><line x1="1185" y1="291" x2="1294" y2="415" class="ul"/><line x1="1185" y1="291" x2="815" y2="590" class="ul faint"/><line x1="1185" y1="291" x2="815" y2="668" class="ul faint"/><line x1="990" y1="167" x2="1131" y2="415" class="fwl"/><line x1="990" y1="167" x2="1294" y2="415" class="fwl"/><line x1="1160" y1="167" x2="1131" y2="415" class="fwl"/><line x1="1160" y1="167" x2="1294" y2="415" class="fwl"/><text x="1360" y="205" class="ann end">e1/24→LF-03 · e1/26→LF-04 · 10.120.244.64/28 · eBGP</text><text x="1060" y="40" class="ann">Internet / ISPs / IPsec mesh (unchanged)</text><line x1="990" y1="46" x2="990" y2="115" class="fwl"/><line x1="1160" y1="46" x2="1160" y2="115" class="fwl"/><line x1="665" y1="618" x2="735" y2="618" class="dci"/><line x1="665" y1="696" x2="735" y2="696" class="dci"/><text x="700" y="660" class="ann">L3 DCI</text><text x="700" y="612" class="ann small">A</text><text x="700" y="690" class="ann small">B</text><text x="700" y="790" class="ann">eBGP between BGWs: IPv4 (BGW loopbacks) + L2VPN EVPN (VRF TRUST type-5: site /16 + approved cloud prefixes)</text><g class="legend"><line x1="40" y1="815" x2="80" y2="815" class="ul"/><text x="88" y="819">eBGP underlay /31 + MP-BGP EVPN (eBGP, loopbacks)</text><line x1="360" y1="815" x2="400" y2="815" class="fwl"/><text x="408" y="819">Firewall handoff (routed /29, eBGP)</text><line x1="700" y1="815" x2="740" y2="815" class="dci"/><text x="748" y="819">DCI (eBGP)</text><line x1="880" y1="815" x2="920" y2="815" class="ha"/><text x="928" y="819">HA link</text><line x1="1020" y1="815" x2="1060" y2="815" class="cl"/><text x="1068" y="819">AWS / Azure (eBGP)</text></g></svg><figcaption>Per site: 2 spines (EVPN route servers), 4 leafs in two vPC pairs (LF-03/04 face the firewalls) and 2 Multi-Site BGWs. Carrier A joins the BGW-01s and carrier B the BGW-02s.</figcaption></figure>
+</section><section id="decisions"><h2>4. Design decisions</h2><div class="tw"><table class="dec"><thead><tr><th>#</th><th>Area</th><th>Decision</th><th>Why</th><th>Status</th></tr></thead><tbody><tr><td>D1</td><td>Underlay</td><td>eBGP IPv4 unicast on /31 links, BFD, MTU 9216. Spines share one ASN per site; every leaf and BGW has its own</td><td>One protocol end to end; <code>bestpath as-path multipath-relax</code> for ECMP.</td><td>Decided</td></tr><tr><td>D2</td><td>Overlay</td><td>MP-BGP L2VPN EVPN, eBGP between loopbacks. Spines are route servers (retain RT all, next-hop unchanged)</td><td>With eBGP the spines can't be route reflectors.</td><td>Decided</td></tr><tr><td>D3</td><td>Host gateways</td><td>Distributed anycast gateway, shared MAC <code>2020.0000.00aa</code>, symmetric IRB</td><td>Local routing on every leaf.</td><td>Recommended</td></tr><tr><td>D4</td><td>VRFs</td><td>One tenant VRF, <b>TRUST</b> (L3VNI 50010)</td><td>Keep segmentation a separate step.</td><td>Recommended</td></tr><tr><td>D5</td><td>VNI numbering</td><td>L2VNI = site base + VLAN: DC1 110000 + VLAN, DC2 120000 + VLAN</td><td>Site-local L2VNIs; reads as the site.</td><td>Recommended</td></tr><tr><td>D6</td><td>RD / RT</td><td>RD auto; explicit RTs everywhere</td><td>Auto RTs differ per leaf ASN.</td><td>Recommended</td></tr><tr><td>D7</td><td>Firewall attachment</td><td>Routed /29 transits to LF-03/LF-04, eBGP with BFD, ECMP on the firewall</td><td>No routing over vPC.</td><td>Recommended</td></tr><tr><td>D8</td><td>DCI</td><td>Two carriers, one per BGW pair; only BGW loopbacks in the DCI underlay</td><td>Each site stays its own failure domain.</td><td>Recommended</td></tr><tr><td>D9</td><td>Cloud</td><td>AWS DX and Azure ER on the BGWs in VRF TRUST, strict allowlists</td><td>Cloud prefixes cross the DCI as type-5 backup paths.</td><td>Recommended</td></tr></tbody></table></div><h3>Cisco best-practice alignment</h3><div class="tw"><table class=""><thead><tr><th>Practice</th><th>In this design</th><th>Where</th></tr></thead><tbody><tr><td>Spine-leaf, routed /31 underlay, MTU 9216</td><td>Yes</td><td>§5</td></tr><tr><td>Loopback0 for router-ID/peering, loopback1 for the VTEP, vPC anycast VTEP as secondary</td><td>Yes</td><td>§5</td></tr><tr><td>BGP-only fabric: eBGP underlay, MP-BGP EVPN overlay between loopbacks</td><td>Yes</td><td>D1, D2</td></tr><tr><td>BFD on underlay, firewall, DCI and cloud sessions</td><td>Yes</td><td>§9</td></tr><tr><td>Distributed anycast gateway, symmetric IRB, one L3VNI per VRF</td><td>Yes</td><td>D3, D4</td></tr><tr><td>vPC with <code>advertise-pip</code> and <code>advertise virtual-rmac</code>; backup underlay VLAN in <code>system nve infra-vlans</code></td><td>Yes</td><td>§5, §9</td></tr><tr><td>ARP suppression</td><td>Yes (needs TCAM carving on -EX/-FX)</td><td>§9</td></tr><tr><td>BUM replication</td><td>Ingress replication. Multicast (PIM, anycast RP on the spines) is the NDFC default and scales better, but at 6 VTEPs per site IR is simpler and fully supported. Revisit beyond ~20 VTEPs or heavy BUM</td><td>§4</td></tr><tr><td>Anycast BGW (not vPC BGW), fabric and DCI tracking, delay-restore</td><td>Yes</td><td>§8</td></tr><tr><td>External connectivity per VRF with eBGP, no IGP redistribution</td><td>Yes</td><td>D7</td></tr><tr><td>Default route only from the edge; never across the DCI</td><td>Yes</td><td>§8</td></tr><tr><td>Manage with Nexus Dashboard Fabric Controller (NDFC)</td><td>Recommended for production: the BGP fabric and Multi-Site Domain templates generate equivalent configs and keep them in sync</td><td>§4</td></tr></tbody></table></div></section><section id="addressing"><h2>5. Infrastructure addressing</h2>
+<p>Each site uses <b>10.x.240.0/21</b> for infrastructure. Both sites have the same layout, so swapping 110 for 120 maps DC1 to DC2.</p>
+<h3>Block plan</h3>
+<div class="tw"><table class=""><thead><tr><th>DC1</th><th>DC2</th><th>Use</th><th>Allocation</th></tr></thead><tbody><tr><td><code>10.110.240.0/24</code></td><td><code>10.120.240.0/24</code></td><td>Loopback0: router-ID and EVPN peering</td><td>One /32 per device</td></tr><tr><td><code>10.110.241.0/24</code></td><td><code>10.120.241.0/24</code></td><td>Loopback1: VTEP (NVE source), vPC anycast VTEP, Multi-Site VIP (loopback100)</td><td>Leafs/BGWs .11–.22, vPC VIPs .101–.102, BGW VIP .200</td></tr><tr><td><code>10.110.242.0/24</code></td><td><code>10.120.242.0/24</code></td><td>Underlay point-to-point /31s (spine to leaf/BGW)</td><td>Spine-01 from .0, spine-02 from .32; spine side even</td></tr><tr><td><code>10.110.243.0/24</code></td><td><code>10.120.243.0/24</code></td><td>vPC peer-keepalive and backup underlay VLAN 3900 (/30s)</td><td>Pair A .0–.7, pair B .8–.15</td></tr><tr><td><code>10.110.244.0/24</code></td><td><code>10.120.244.0/24</code></td><td>Day-one cloud peering in VRF TRUST: AWS Direct Connect and Azure ExpressRoute (one /29 slot per peering)</td><td>.0/29 DX conn 1 (BGW-01), .8/29 DX conn 2 (BGW-02), .16/29 ER = primary .16/30 (BGW-01) + secondary .20/30 (BGW-02). .64/29 + .72/29: firewall eBGP transit (LF-03, LF-04). The rest is reserved for per-VRF firewall transit</td></tr><tr><td><code>10.110.245.0/24</code></td><td><code>10.120.245.0/24</code></td><td>New OOB management for mgmt0 (gateway on the firewall, not on the fabric)</td><td>Gateway .1, devices .11–.32</td></tr><tr><td><code>10.110.246.0/24</code></td><td><code>10.120.246.0/24</code></td><td>DCI point-to-point /31s (each site owns one carrier)</td><td>DC1: carrier A, DC2: carrier B</td></tr><tr><td><code>10.110.247.0/24</code></td><td><code>10.120.247.0/24</code></td><td>Reserved for growth (more leafs, a second pod)</td><td></td></tr></tbody></table></div>
+<h3>Devices: DC1</h3>
+<div class="tw"><table class=""><thead><tr><th>Hostname</th><th>Role</th><th>Lo0 / router-ID</th><th>Lo1 / VTEP</th><th>Shared addresses</th><th>mgmt0 (OOB)</th><th>AS</th></tr></thead><tbody><tr><td><b>DC1-NXSP-01</b></td><td>Spine / EVPN route server</td><td><code>10.110.240.1/32</code></td><td>—</td><td>—</td><td><code>10.110.245.11/24</code></td><td>65210</td></tr><tr><td><b>DC1-NXSP-02</b></td><td>Spine / EVPN route server</td><td><code>10.110.240.2/32</code></td><td>—</td><td>—</td><td><code>10.110.245.12/24</code></td><td>65210</td></tr><tr><td><b>DC1-NXLF-01</b></td><td>Leaf / VTEP</td><td><code>10.110.240.11/32</code></td><td><code>10.110.241.11/32</code></td><td>vPC anycast VTEP <code>10.110.241.101/32</code></td><td><code>10.110.245.21/24</code></td><td>65211</td></tr><tr><td><b>DC1-NXLF-02</b></td><td>Leaf / VTEP</td><td><code>10.110.240.12/32</code></td><td><code>10.110.241.12/32</code></td><td>vPC anycast VTEP <code>10.110.241.101/32</code></td><td><code>10.110.245.22/24</code></td><td>65212</td></tr><tr><td><b>DC1-NXLF-03</b></td><td>Border-service leaf / VTEP</td><td><code>10.110.240.13/32</code></td><td><code>10.110.241.13/32</code></td><td>vPC anycast VTEP <code>10.110.241.102/32</code></td><td><code>10.110.245.23/24</code></td><td>65213</td></tr><tr><td><b>DC1-NXLF-04</b></td><td>Border-service leaf / VTEP</td><td><code>10.110.240.14/32</code></td><td><code>10.110.241.14/32</code></td><td>vPC anycast VTEP <code>10.110.241.102/32</code></td><td><code>10.110.245.24/24</code></td><td>65214</td></tr><tr><td><b>DC1-NXBGW-01</b></td><td>Multi-Site BGW</td><td><code>10.110.240.21/32</code></td><td><code>10.110.241.21/32</code></td><td>Multi-Site VIP <code>10.110.241.200/32</code></td><td><code>10.110.245.31/24</code></td><td>65215</td></tr><tr><td><b>DC1-NXBGW-02</b></td><td>Multi-Site BGW</td><td><code>10.110.240.22/32</code></td><td><code>10.110.241.22/32</code></td><td>Multi-Site VIP <code>10.110.241.200/32</code></td><td><code>10.110.245.32/24</code></td><td>65216</td></tr></tbody></table></div>
+<h3>Devices: DC2</h3>
+<div class="tw"><table class=""><thead><tr><th>Hostname</th><th>Role</th><th>Lo0 / router-ID</th><th>Lo1 / VTEP</th><th>Shared addresses</th><th>mgmt0 (OOB)</th><th>AS</th></tr></thead><tbody><tr><td><b>DC2-NXSP-01</b></td><td>Spine / EVPN route server</td><td><code>10.120.240.1/32</code></td><td>—</td><td>—</td><td><code>10.120.245.11/24</code></td><td>65220</td></tr><tr><td><b>DC2-NXSP-02</b></td><td>Spine / EVPN route server</td><td><code>10.120.240.2/32</code></td><td>—</td><td>—</td><td><code>10.120.245.12/24</code></td><td>65220</td></tr><tr><td><b>DC2-NXLF-01</b></td><td>Leaf / VTEP</td><td><code>10.120.240.11/32</code></td><td><code>10.120.241.11/32</code></td><td>vPC anycast VTEP <code>10.120.241.101/32</code></td><td><code>10.120.245.21/24</code></td><td>65221</td></tr><tr><td><b>DC2-NXLF-02</b></td><td>Leaf / VTEP</td><td><code>10.120.240.12/32</code></td><td><code>10.120.241.12/32</code></td><td>vPC anycast VTEP <code>10.120.241.101/32</code></td><td><code>10.120.245.22/24</code></td><td>65222</td></tr><tr><td><b>DC2-NXLF-03</b></td><td>Border-service leaf / VTEP</td><td><code>10.120.240.13/32</code></td><td><code>10.120.241.13/32</code></td><td>vPC anycast VTEP <code>10.120.241.102/32</code></td><td><code>10.120.245.23/24</code></td><td>65223</td></tr><tr><td><b>DC2-NXLF-04</b></td><td>Border-service leaf / VTEP</td><td><code>10.120.240.14/32</code></td><td><code>10.120.241.14/32</code></td><td>vPC anycast VTEP <code>10.120.241.102/32</code></td><td><code>10.120.245.24/24</code></td><td>65224</td></tr><tr><td><b>DC2-NXBGW-01</b></td><td>Multi-Site BGW</td><td><code>10.120.240.21/32</code></td><td><code>10.120.241.21/32</code></td><td>Multi-Site VIP <code>10.120.241.200/32</code></td><td><code>10.120.245.31/24</code></td><td>65225</td></tr><tr><td><b>DC2-NXBGW-02</b></td><td>Multi-Site BGW</td><td><code>10.120.240.22/32</code></td><td><code>10.120.241.22/32</code></td><td>Multi-Site VIP <code>10.120.241.200/32</code></td><td><code>10.120.245.32/24</code></td><td>65226</td></tr></tbody></table></div>
+<h3>Underlay links: DC1</h3>
+<div class="tw"><table class="compact"><thead><tr><th>Spine</th><th>Port</th><th>Spine IP</th><th>Peer</th><th>Port</th><th>Peer IP</th></tr></thead><tbody><tr><td>DC1-NXSP-01</td><td>Eth1/1</td><td><code>10.110.242.0/31</code></td><td>DC1-NXLF-01</td><td>Eth1/49</td><td><code>10.110.242.1/31</code></td></tr><tr><td>DC1-NXSP-01</td><td>Eth1/2</td><td><code>10.110.242.2/31</code></td><td>DC1-NXLF-02</td><td>Eth1/49</td><td><code>10.110.242.3/31</code></td></tr><tr><td>DC1-NXSP-01</td><td>Eth1/3</td><td><code>10.110.242.4/31</code></td><td>DC1-NXLF-03</td><td>Eth1/49</td><td><code>10.110.242.5/31</code></td></tr><tr><td>DC1-NXSP-01</td><td>Eth1/4</td><td><code>10.110.242.6/31</code></td><td>DC1-NXLF-04</td><td>Eth1/49</td><td><code>10.110.242.7/31</code></td></tr><tr><td>DC1-NXSP-01</td><td>Eth1/5</td><td><code>10.110.242.8/31</code></td><td>DC1-NXBGW-01</td><td>Eth1/49</td><td><code>10.110.242.9/31</code></td></tr><tr><td>DC1-NXSP-01</td><td>Eth1/6</td><td><code>10.110.242.10/31</code></td><td>DC1-NXBGW-02</td><td>Eth1/49</td><td><code>10.110.242.11/31</code></td></tr><tr><td>DC1-NXSP-02</td><td>Eth1/1</td><td><code>10.110.242.32/31</code></td><td>DC1-NXLF-01</td><td>Eth1/50</td><td><code>10.110.242.33/31</code></td></tr><tr><td>DC1-NXSP-02</td><td>Eth1/2</td><td><code>10.110.242.34/31</code></td><td>DC1-NXLF-02</td><td>Eth1/50</td><td><code>10.110.242.35/31</code></td></tr><tr><td>DC1-NXSP-02</td><td>Eth1/3</td><td><code>10.110.242.36/31</code></td><td>DC1-NXLF-03</td><td>Eth1/50</td><td><code>10.110.242.37/31</code></td></tr><tr><td>DC1-NXSP-02</td><td>Eth1/4</td><td><code>10.110.242.38/31</code></td><td>DC1-NXLF-04</td><td>Eth1/50</td><td><code>10.110.242.39/31</code></td></tr><tr><td>DC1-NXSP-02</td><td>Eth1/5</td><td><code>10.110.242.40/31</code></td><td>DC1-NXBGW-01</td><td>Eth1/50</td><td><code>10.110.242.41/31</code></td></tr><tr><td>DC1-NXSP-02</td><td>Eth1/6</td><td><code>10.110.242.42/31</code></td><td>DC1-NXBGW-02</td><td>Eth1/50</td><td><code>10.110.242.43/31</code></td></tr></tbody></table></div>
+<h3>Underlay links: DC2</h3>
+<div class="tw"><table class="compact"><thead><tr><th>Spine</th><th>Port</th><th>Spine IP</th><th>Peer</th><th>Port</th><th>Peer IP</th></tr></thead><tbody><tr><td>DC2-NXSP-01</td><td>Eth1/1</td><td><code>10.120.242.0/31</code></td><td>DC2-NXLF-01</td><td>Eth1/49</td><td><code>10.120.242.1/31</code></td></tr><tr><td>DC2-NXSP-01</td><td>Eth1/2</td><td><code>10.120.242.2/31</code></td><td>DC2-NXLF-02</td><td>Eth1/49</td><td><code>10.120.242.3/31</code></td></tr><tr><td>DC2-NXSP-01</td><td>Eth1/3</td><td><code>10.120.242.4/31</code></td><td>DC2-NXLF-03</td><td>Eth1/49</td><td><code>10.120.242.5/31</code></td></tr><tr><td>DC2-NXSP-01</td><td>Eth1/4</td><td><code>10.120.242.6/31</code></td><td>DC2-NXLF-04</td><td>Eth1/49</td><td><code>10.120.242.7/31</code></td></tr><tr><td>DC2-NXSP-01</td><td>Eth1/5</td><td><code>10.120.242.8/31</code></td><td>DC2-NXBGW-01</td><td>Eth1/49</td><td><code>10.120.242.9/31</code></td></tr><tr><td>DC2-NXSP-01</td><td>Eth1/6</td><td><code>10.120.242.10/31</code></td><td>DC2-NXBGW-02</td><td>Eth1/49</td><td><code>10.120.242.11/31</code></td></tr><tr><td>DC2-NXSP-02</td><td>Eth1/1</td><td><code>10.120.242.32/31</code></td><td>DC2-NXLF-01</td><td>Eth1/50</td><td><code>10.120.242.33/31</code></td></tr><tr><td>DC2-NXSP-02</td><td>Eth1/2</td><td><code>10.120.242.34/31</code></td><td>DC2-NXLF-02</td><td>Eth1/50</td><td><code>10.120.242.35/31</code></td></tr><tr><td>DC2-NXSP-02</td><td>Eth1/3</td><td><code>10.120.242.36/31</code></td><td>DC2-NXLF-03</td><td>Eth1/50</td><td><code>10.120.242.37/31</code></td></tr><tr><td>DC2-NXSP-02</td><td>Eth1/4</td><td><code>10.120.242.38/31</code></td><td>DC2-NXLF-04</td><td>Eth1/50</td><td><code>10.120.242.39/31</code></td></tr><tr><td>DC2-NXSP-02</td><td>Eth1/5</td><td><code>10.120.242.40/31</code></td><td>DC2-NXBGW-01</td><td>Eth1/50</td><td><code>10.120.242.41/31</code></td></tr><tr><td>DC2-NXSP-02</td><td>Eth1/6</td><td><code>10.120.242.42/31</code></td><td>DC2-NXBGW-02</td><td>Eth1/50</td><td><code>10.120.242.43/31</code></td></tr></tbody></table></div>
+<h3>vPC pairs</h3>
+<div class="tw"><table class=""><thead><tr><th>Domain</th><th>Members</th><th>Peer-keepalive</th><th>Backup underlay VLAN 3900</th><th>Anycast VTEP</th><th>Peer-link</th></tr></thead><tbody><tr><td>111</td><td>DC1-NXLF-01 + DC1-NXLF-02</td><td><code>10.110.243.1/30</code> / <code>10.110.243.2/30</code> (Eth1/48, VRF KEEPALIVE)</td><td><code>10.110.243.5/30</code> / <code>10.110.243.6/30</code></td><td><code>10.110.241.101/32</code></td><td>Po10 (Eth1/53–54)</td></tr><tr><td>112</td><td>DC1-NXLF-03 + DC1-NXLF-04</td><td><code>10.110.243.9/30</code> / <code>10.110.243.10/30</code> (Eth1/48, VRF KEEPALIVE)</td><td><code>10.110.243.13/30</code> / <code>10.110.243.14/30</code></td><td><code>10.110.241.102/32</code></td><td>Po10 (Eth1/53–54)</td></tr><tr><td>121</td><td>DC2-NXLF-01 + DC2-NXLF-02</td><td><code>10.120.243.1/30</code> / <code>10.120.243.2/30</code> (Eth1/48, VRF KEEPALIVE)</td><td><code>10.120.243.5/30</code> / <code>10.120.243.6/30</code></td><td><code>10.120.241.101/32</code></td><td>Po10 (Eth1/53–54)</td></tr><tr><td>122</td><td>DC2-NXLF-03 + DC2-NXLF-04</td><td><code>10.120.243.9/30</code> / <code>10.120.243.10/30</code> (Eth1/48, VRF KEEPALIVE)</td><td><code>10.120.243.13/30</code> / <code>10.120.243.14/30</code></td><td><code>10.120.241.102/32</code></td><td>Po10 (Eth1/53–54)</td></tr></tbody></table></div>
+<h3>DCI, firewall and cloud handoff</h3>
+<div class="tw"><table class=""><thead><tr><th>Link</th><th>Side A</th><th>Side B</th><th>Notes</th></tr></thead><tbody><tr><td>Carrier A</td><td>DC1-NXBGW-01 Eth1/51 <code>10.110.246.0/31</code></td><td>DC2-NXBGW-01 Eth1/51 <code>10.110.246.1/31</code></td><td>DC1 owns the addressing</td></tr><tr><td>Carrier B</td><td>DC2-NXBGW-02 Eth1/51 <code>10.120.246.0/31</code></td><td>DC1-NXBGW-02 Eth1/51 <code>10.120.246.1/31</code></td><td>DC2 owns the addressing</td></tr><tr><td>DC1 firewall</td><td>DC1-FW-01/02 ethernet1/24 <code>10.110.244.65/29</code> (AS 65217)</td><td>DC1-NXLF-03 VLAN 3011 SVI <code>10.110.244.66/29</code> (AS 65213)</td><td>eBGP + BFD, VRF TRUST. FW-01 on Eth1/45, FW-02 on Eth1/46</td></tr><tr><td>DC1 firewall</td><td>DC1-FW-01/02 ethernet1/26 <code>10.110.244.73/29</code> (AS 65217)</td><td>DC1-NXLF-04 VLAN 3012 SVI <code>10.110.244.74/29</code> (AS 65214)</td><td>eBGP + BFD, VRF TRUST. FW-01 on Eth1/45, FW-02 on Eth1/46</td></tr><tr><td>DC2 firewall</td><td>DC2-FW-01/02 ethernet1/24 <code>10.120.244.65/29</code> (AS 65227)</td><td>DC2-NXLF-03 VLAN 3011 SVI <code>10.120.244.66/29</code> (AS 65223)</td><td>eBGP + BFD, VRF TRUST. FW-01 on Eth1/45, FW-02 on Eth1/46</td></tr><tr><td>DC2 firewall</td><td>DC2-FW-01/02 ethernet1/26 <code>10.120.244.73/29</code> (AS 65227)</td><td>DC2-NXLF-04 VLAN 3012 SVI <code>10.120.244.74/29</code> (AS 65224)</td><td>eBGP + BFD, VRF TRUST. FW-01 on Eth1/45, FW-02 on Eth1/46</td></tr><tr><td>DC1 AWS DX connection 1</td><td>DC1-NXBGW-01 Eth1/52.&lt;VIF VLAN&gt; <code>10.110.244.1/30</code></td><td>AWS (AS 64512) <code>10.110.244.2</code></td><td>Private VIF, VRF TRUST, BFD, MD5</td></tr><tr><td>DC1 Azure ER primary</td><td>DC1-NXBGW-01 Eth1/52.&lt;ER VLAN&gt; <code>10.110.244.17/30</code></td><td>Microsoft MSEE (AS 12076) <code>10.110.244.18</code></td><td>Private peering, VRF TRUST, BFD</td></tr><tr><td>DC1 AWS DX connection 2</td><td>DC1-NXBGW-02 Eth1/52.&lt;VIF VLAN&gt; <code>10.110.244.9/30</code></td><td>AWS (AS 64512) <code>10.110.244.10</code></td><td>Private VIF, VRF TRUST, BFD, MD5</td></tr><tr><td>DC1 Azure ER secondary</td><td>DC1-NXBGW-02 Eth1/52.&lt;ER VLAN&gt; <code>10.110.244.21/30</code></td><td>Microsoft MSEE (AS 12076) <code>10.110.244.22</code></td><td>Private peering, VRF TRUST, BFD</td></tr><tr><td>DC2 AWS DX connection 1</td><td>DC2-NXBGW-01 Eth1/52.&lt;VIF VLAN&gt; <code>10.120.244.1/30</code></td><td>AWS (AS 64512) <code>10.120.244.2</code></td><td>Private VIF, VRF TRUST, BFD, MD5</td></tr><tr><td>DC2 Azure ER primary</td><td>DC2-NXBGW-01 Eth1/52.&lt;ER VLAN&gt; <code>10.120.244.17/30</code></td><td>Microsoft MSEE (AS 12076) <code>10.120.244.18</code></td><td>Private peering, VRF TRUST, BFD</td></tr><tr><td>DC2 AWS DX connection 2</td><td>DC2-NXBGW-02 Eth1/52.&lt;VIF VLAN&gt; <code>10.120.244.9/30</code></td><td>AWS (AS 64512) <code>10.120.244.10</code></td><td>Private VIF, VRF TRUST, BFD, MD5</td></tr><tr><td>DC2 Azure ER secondary</td><td>DC2-NXBGW-02 Eth1/52.&lt;ER VLAN&gt; <code>10.120.244.21/30</code></td><td>Microsoft MSEE (AS 12076) <code>10.120.244.22</code></td><td>Private peering, VRF TRUST, BFD</td></tr></tbody></table></div>
+<h3>BGP AS plan</h3>
+<div class="tw"><table class=""><thead><tr><th>Role</th><th>DC1</th><th>DC2</th></tr></thead><tbody><tr><td>Spines (both)</td><td>65210</td><td>65220</td></tr><tr><td>LF-01</td><td>65211</td><td>65221</td></tr><tr><td>LF-02</td><td>65212</td><td>65222</td></tr><tr><td>LF-03 (border-service)</td><td>65213</td><td>65223</td></tr><tr><td>LF-04 (border-service)</td><td>65214</td><td>65224</td></tr><tr><td>BGW-01</td><td>65215</td><td>65225</td></tr><tr><td>BGW-02</td><td>65216</td><td>65226</td></tr><tr><td>Palo Alto HA pair</td><td>65217</td><td>65227</td></tr><tr><td>Legacy core (migration only)</td><td>65218</td><td>65228</td></tr><tr><td>AWS DX gateway / Azure ER</td><td>64512 / 12076</td><td>64512 / 12076</td></tr></tbody></table></div>
+</section><section id="tenants"><h2>6. VLAN, VNI and VRF matrix</h2>
+<h3>6.1 Routed VLANs: anycast gateway in VRF TRUST</h3>
+<p>Gateway = <code>.1</code> of each subnet.</p>
+<div class="tw"><table class=""><thead><tr><th>VLAN</th><th>Name</th><th>DC1 subnet</th><th>DC1 L2VNI</th><th>DC2 subnet</th><th>DC2 L2VNI</th><th>Notes</th></tr></thead><tbody><tr><td>10</td><td>Management</td><td><code>10.110.10.0/24</code></td><td>110010</td><td><code>10.120.10.0/24</code></td><td>120010</td><td></td></tr><tr><td>20</td><td>Servers</td><td><code>10.110.20.0/24</code></td><td>110020</td><td><code>10.120.20.0/24</code></td><td>120020</td><td></td></tr><tr><td>30</td><td>Applications</td><td><code>10.110.30.0/24</code></td><td>110030</td><td><code>10.120.30.0/24</code></td><td>120030</td><td></td></tr><tr><td>40</td><td>Databases</td><td><code>10.110.40.0/24</code></td><td>110040</td><td><code>10.120.40.0/24</code></td><td>120040</td><td></td></tr><tr><td>100</td><td>Storage</td><td><code>10.110.100.0/24</code></td><td>110100</td><td><code>10.120.100.0/24</code></td><td>120100</td><td>Jumbo MTU end to end.</td></tr></tbody></table></div>
+<h3>6.2 DMZ VLANs: gateway stays on the firewall (optional phase)</h3>
+<p>Only if the DMZ moves into the fabric: L2-only VNIs on LF-03/LF-04.</p>
+<div class="tw"><table class=""><thead><tr><th>VLAN</th><th>Name</th><th>DC1 subnet</th><th>DC1 L2VNI</th><th>DC2 subnet</th><th>DC2 L2VNI</th></tr></thead><tbody><tr><td>200</td><td>DMZ web</td><td><code>172.31.10.0/24</code></td><td>110200</td><td><code>172.31.20.0/24</code></td><td>120200</td></tr></tbody></table></div>
+<h3>6.3 Stays directly on the firewall</h3>
+<p>Internet circuits and remote-access appliances stay on the firewalls.</p>
+<h3>6.4 VRFs</h3>
+<div class="tw"><table class=""><thead><tr><th>VRF</th><th>ID</th><th>L3VNI</th><th>L3VNI VLAN</th><th>Route target</th><th>Sites</th><th>Contents</th></tr></thead><tbody><tr><td><b>TRUST</b></td><td>10</td><td>50010</td><td>3910</td><td><code>65000:50010</code></td><td>Both</td><td>Everything in §6.1</td></tr></tbody></table></div>
+<p class="small">VLANs 3900–3950 sit below the NX-OS reserved range (3968–4095).</p>
+</section><section id="firewall"><h2>7. Firewall integration</h2>
+<p>The firewalls connect to the border-service leafs with routed /29 links and eBGP (AS 65217 / 65227). They advertise only 0.0.0.0/0 and accept only the two site /16s, with ECMP across both leafs.</p>
+<details><summary>PAN-OS commands: DC1</summary><pre><code># =============================================================================
+# DC1-FW-01 / DC1-FW-02 · firewall handoff to the fabric (PAN-OS, configure mode)
+# DEMO DATA. Apply on the active member in the M5 change window; HA syncs the peer.
+# Replaces ae8 (10.110.99.100/24) + OSPF with two routed interfaces + eBGP (AS 65217).
+# Before committing: check that no security, NAT or PBF rule references ae8, and review
+# &quot;show config diff&quot;. Validate each command on the box.
+# =============================================================================
+
+# 1. Remove ae8 (OSPF, virtual router, zone, interface) and free its members.
+delete network virtual-router default protocol ospf area 0.0.0.0 interface ae8
+delete network virtual-router default interface ae8
+delete zone Trust network layer3 ae8
+delete network interface aggregate-ethernet ae8
+delete network interface ethernet ethernet1/24 aggregate-group
+delete network interface ethernet ethernet1/26 aggregate-group
+
+# 2. Two routed transit interfaces (Trust zone, VR default).
+set network interface ethernet ethernet1/24 layer3 ip 10.110.244.65/29
+set network interface ethernet ethernet1/24 comment &quot;DC1-NXLF-03 Eth1/45-46 VLAN 3011 (10.110.244.64/29)&quot;
+set network interface ethernet ethernet1/26 layer3 ip 10.110.244.73/29
+set network interface ethernet ethernet1/26 comment &quot;DC1-NXLF-04 Eth1/45-46 VLAN 3012 (10.110.244.72/29)&quot;
+set network virtual-router default interface [ ethernet1/24 ethernet1/26 ]
+set zone Trust network layer3 [ ethernet1/24 ethernet1/26 ]
+
+# 3. eBGP to both border leafs, ECMP across them. OSPF is no longer used.
+set network virtual-router default protocol bgp enable yes
+set network virtual-router default protocol bgp router-id 10.110.244.65
+set network virtual-router default protocol bgp local-as 65217
+set network virtual-router default protocol bgp install-route yes
+set network virtual-router default protocol bgp allow-redist-default-route yes
+set network virtual-router default protocol bgp routing-options ecmp-multi-as yes
+set network virtual-router default protocol bgp peer-group FABRIC enable yes type ebgp import-nexthop original export-nexthop resolve remove-private-as no
+set network virtual-router default protocol bgp peer-group FABRIC peer DC1-NXLF-03 enable yes peer-as 65213 local-address interface ethernet1/24 ip 10.110.244.65/29 peer-address ip 10.110.244.66 bfd profile default
+set network virtual-router default protocol bgp peer-group FABRIC peer DC1-NXLF-04 enable yes peer-as 65214 local-address interface ethernet1/26 ip 10.110.244.73/29 peer-address ip 10.110.244.74 bfd profile default
+set network virtual-router default ecmp enable yes max-path 2
+set network virtual-router default protocol ospf enable no
+
+# 4. Policy: send only the default route; accept only the DC1 and DC2 site prefixes.
+set network virtual-router default protocol bgp redist-rules 0.0.0.0/0 enable yes set-origin igp address-family-identifier ipv4
+set network virtual-router default protocol bgp policy export rules DEFAULT-ONLY enable yes used-by FABRIC match address-prefix 0.0.0.0/0 exact yes
+set network virtual-router default protocol bgp policy export rules DEFAULT-ONLY action allow
+set network virtual-router default protocol bgp policy export rules DENY-REST enable yes used-by FABRIC action deny
+set network virtual-router default protocol bgp policy import rules SITE-PREFIXES enable yes used-by FABRIC match address-prefix 10.110.0.0/16 exact no
+set network virtual-router default protocol bgp policy import rules SITE-PREFIXES match address-prefix 10.120.0.0/16 exact no
+set network virtual-router default protocol bgp policy import rules SITE-PREFIXES action allow
+set network virtual-router default protocol bgp policy import rules DENY-REST enable yes used-by FABRIC action deny
+
+# Commit, then check:
+#   show routing protocol bgp peer          -&gt; 2 peers Established (65213, 65214)
+#   show routing route type bgp             -&gt; site prefixes via both next hops</code></pre></details>
+<details><summary>PAN-OS commands: DC2</summary><pre><code># =============================================================================
+# DC2-FW-01 / DC2-FW-02 · firewall handoff to the fabric (PAN-OS, configure mode)
+# DEMO DATA. Apply on the active member in the M5 change window; HA syncs the peer.
+# Replaces ae8 (10.120.99.100/24) + OSPF with two routed interfaces + eBGP (AS 65227).
+# Before committing: check that no security, NAT or PBF rule references ae8, and review
+# &quot;show config diff&quot;. Validate each command on the box.
+# =============================================================================
+
+# 1. Remove ae8 (OSPF, virtual router, zone, interface) and free its members.
+delete network virtual-router default protocol ospf area 0.0.0.0 interface ae8
+delete network virtual-router default interface ae8
+delete zone Trust network layer3 ae8
+delete network interface aggregate-ethernet ae8
+delete network interface ethernet ethernet1/24 aggregate-group
+delete network interface ethernet ethernet1/26 aggregate-group
+
+# 2. Two routed transit interfaces (Trust zone, VR default).
+set network interface ethernet ethernet1/24 layer3 ip 10.120.244.65/29
+set network interface ethernet ethernet1/24 comment &quot;DC2-NXLF-03 Eth1/45-46 VLAN 3011 (10.120.244.64/29)&quot;
+set network interface ethernet ethernet1/26 layer3 ip 10.120.244.73/29
+set network interface ethernet ethernet1/26 comment &quot;DC2-NXLF-04 Eth1/45-46 VLAN 3012 (10.120.244.72/29)&quot;
+set network virtual-router default interface [ ethernet1/24 ethernet1/26 ]
+set zone Trust network layer3 [ ethernet1/24 ethernet1/26 ]
+
+# 3. eBGP to both border leafs, ECMP across them. OSPF is no longer used.
+set network virtual-router default protocol bgp enable yes
+set network virtual-router default protocol bgp router-id 10.120.244.65
+set network virtual-router default protocol bgp local-as 65227
+set network virtual-router default protocol bgp install-route yes
+set network virtual-router default protocol bgp allow-redist-default-route yes
+set network virtual-router default protocol bgp routing-options ecmp-multi-as yes
+set network virtual-router default protocol bgp peer-group FABRIC enable yes type ebgp import-nexthop original export-nexthop resolve remove-private-as no
+set network virtual-router default protocol bgp peer-group FABRIC peer DC2-NXLF-03 enable yes peer-as 65223 local-address interface ethernet1/24 ip 10.120.244.65/29 peer-address ip 10.120.244.66 bfd profile default
+set network virtual-router default protocol bgp peer-group FABRIC peer DC2-NXLF-04 enable yes peer-as 65224 local-address interface ethernet1/26 ip 10.120.244.73/29 peer-address ip 10.120.244.74 bfd profile default
+set network virtual-router default ecmp enable yes max-path 2
+set network virtual-router default protocol ospf enable no
+
+# 4. Policy: send only the default route; accept only the DC1 and DC2 site prefixes.
+set network virtual-router default protocol bgp redist-rules 0.0.0.0/0 enable yes set-origin igp address-family-identifier ipv4
+set network virtual-router default protocol bgp policy export rules DEFAULT-ONLY enable yes used-by FABRIC match address-prefix 0.0.0.0/0 exact yes
+set network virtual-router default protocol bgp policy export rules DEFAULT-ONLY action allow
+set network virtual-router default protocol bgp policy export rules DENY-REST enable yes used-by FABRIC action deny
+set network virtual-router default protocol bgp policy import rules SITE-PREFIXES enable yes used-by FABRIC match address-prefix 10.110.0.0/16 exact no
+set network virtual-router default protocol bgp policy import rules SITE-PREFIXES match address-prefix 10.120.0.0/16 exact no
+set network virtual-router default protocol bgp policy import rules SITE-PREFIXES action allow
+set network virtual-router default protocol bgp policy import rules DENY-REST enable yes used-by FABRIC action deny
+
+# Commit, then check:
+#   show routing protocol bgp peer          -&gt; 2 peers Established (65223, 65224)
+#   show routing route type bgp             -&gt; site prefixes via both next hops</code></pre></details>
+</section><section id="multisite"><h2>8. Multi-Site, DCI and cloud</h2>
+<div class="tw"><table class=""><thead><tr><th>Item</th><th>DC1</th><th>DC2</th></tr></thead><tbody><tr><td>Multi-Site site ID</td><td>110</td><td>120</td></tr><tr><td>BGW Multi-Site VIP (loopback100)</td><td><code>10.110.241.200/32</code></td><td><code>10.120.241.200/32</code></td></tr><tr><td>BGW Lo0</td><td><code>10.110.240.21/.22</code></td><td><code>10.120.240.21/.22</code></td></tr><tr><td>DCI underlay</td><td>eBGP to DC2 over carrier A (BGW-01) and B (BGW-02)</td><td>eBGP to DC1 over carrier A (BGW-01) and B (BGW-02)</td></tr><tr><td>DCI overlay</td><td>eBGP EVPN multihop, Lo0 to both DC2 BGWs, peer-type fabric-external</td><td>Same, toward the DC1 BGWs</td></tr><tr><td>Advertised over DCI</td><td>Type-5 routes in 10.110.0.0/16, AWS/Azure prefixes learned at DC1, BGW loopbacks</td><td>Type-5 routes in 10.120.0.0/16, AWS/Azure prefixes learned at DC2, BGW loopbacks</td></tr><tr><td>Never advertised over DCI</td><td>0.0.0.0/0, prefixes outside the site /16 and cloud allowlists, L2VNIs</td><td>Same</td></tr></tbody></table></div>
+<p><b>Why block the default route:</b> each firewall originates 0/0 into its own fabric only, so internet traffic never leaves through the other site's firewall.</p>
+<h3>AWS Direct Connect and Azure ExpressRoute</h3>
+<ul>
+<li>BGW-01 carries DX connection 1 and the ER primary; BGW-02 carries DX connection 2 and the ER secondary.</li>
+<li>Inbound: approved cloud CIDRs only. Outbound: own /16, plus the other site's /16 prepended as a backup.</li>
+</ul>
+<div class="tw"><table class=""><thead><tr><th>Allowlist</th><th>Prefixes (each le /24)</th></tr></thead><tbody><tr><td>PL-CLOUD-AWS</td><td><code>10.200.0.0/16</code></td></tr><tr><td>PL-CLOUD-AZURE</td><td><code>10.210.0.0/16</code></td></tr></tbody></table></div>
+<p class="small">Example allowlists. Replace them with the VPC and VNet CIDRs that attach to your DX and ER gateways.</p>
+</section><section id="configs"><h2>9. NX-OS configuration templates</h2>
+<p>Complete configurations for all 16 switches, also written as files in <code>configs/</code> next to this workbook.</p>
+<div class="note"><b>Demo only.</b> Validate against your Nexus models and NX-OS release, and fill in every <code>&lt;placeholder&gt;</code>.</div>
+<h3>DC1</h3><details><summary>DC1-NXSP-01 (Spine / EVPN route server) · <a href="configs/DC1-NXSP-01.cfg">DC1-NXSP-01.cfg</a></summary><pre><code>!==============================================================================
+! DC1-NXSP-01 · Spine / EVPN route server · BGP AS 65210
+! DC1-DC2 EVPN/VXLAN Multi-Site demo fabric (BGP only). Generated by fabric_design.
+! FICTIONAL DEMO DATA: not for any real network.
+! Template: validate against the exact Nexus model and NX-OS release before use.
+! Fill in every &lt;placeholder&gt;. Host-gateway SVIs ship shut (migration step M4).
+! Not included: AAA/TACACS, NTP, SNMP, syslog, banners, users. Apply your own baseline.
+!==============================================================================
+
+hostname DC1-NXSP-01
+
+! ---- out-of-band management (10.110.245.0/24, gateway on the firewall) ---
+vrf context management
+  ip route 0.0.0.0/0 10.110.245.1
+interface mgmt0
+  vrf member management
+  ip address 10.110.245.11/24
+
+nv overlay evpn
+feature bgp
+feature bfd
+
+route-map RM-NH-UNCHANGED permit 10
+  set ip next-hop unchanged
+
+interface loopback0
+  description Router-ID / EVPN peering
+  ip address 10.110.240.1/32
+
+interface Ethernet1/1
+  description DC1-NXLF-01 Eth1/49
+  no switchport
+  mtu 9216
+  no ip redirects
+  ip address 10.110.242.0/31
+  no shutdown
+
+interface Ethernet1/2
+  description DC1-NXLF-02 Eth1/49
+  no switchport
+  mtu 9216
+  no ip redirects
+  ip address 10.110.242.2/31
+  no shutdown
+
+interface Ethernet1/3
+  description DC1-NXLF-03 Eth1/49
+  no switchport
+  mtu 9216
+  no ip redirects
+  ip address 10.110.242.4/31
+  no shutdown
+
+interface Ethernet1/4
+  description DC1-NXLF-04 Eth1/49
+  no switchport
+  mtu 9216
+  no ip redirects
+  ip address 10.110.242.6/31
+  no shutdown
+
+interface Ethernet1/5
+  description DC1-NXBGW-01 Eth1/49
+  no switchport
+  mtu 9216
+  no ip redirects
+  ip address 10.110.242.8/31
+  no shutdown
+
+interface Ethernet1/6
+  description DC1-NXBGW-02 Eth1/49
+  no switchport
+  mtu 9216
+  no ip redirects
+  ip address 10.110.242.10/31
+  no shutdown
+
+router bgp 65210
+  router-id 10.110.240.1
+  bestpath as-path multipath-relax
+  address-family ipv4 unicast
+    network 10.110.240.1/32
+    maximum-paths 8
+  address-family l2vpn evpn
+    retain route-target all          ! no VRFs here; keep every EVPN route to pass on
+  neighbor 10.110.242.1
+    remote-as 65211
+    description DC1-NXLF-01 underlay
+    bfd
+    address-family ipv4 unicast
+  neighbor 10.110.242.3
+    remote-as 65212
+    description DC1-NXLF-02 underlay
+    bfd
+    address-family ipv4 unicast
+  neighbor 10.110.242.5
+    remote-as 65213
+    description DC1-NXLF-03 underlay
+    bfd
+    address-family ipv4 unicast
+  neighbor 10.110.242.7
+    remote-as 65214
+    description DC1-NXLF-04 underlay
+    bfd
+    address-family ipv4 unicast
+  neighbor 10.110.242.9
+    remote-as 65215
+    description DC1-NXBGW-01 underlay
+    bfd
+    address-family ipv4 unicast
+  neighbor 10.110.242.11
+    remote-as 65216
+    description DC1-NXBGW-02 underlay
+    bfd
+    address-family ipv4 unicast
+  neighbor 10.110.240.11
+    remote-as 65211
+    description DC1-NXLF-01 EVPN
+    update-source loopback0
+    ebgp-multihop 2
+    address-family l2vpn evpn
+      send-community
+      send-community extended
+      route-map RM-NH-UNCHANGED out   ! next hop stays the originating VTEP
+  neighbor 10.110.240.12
+    remote-as 65212
+    description DC1-NXLF-02 EVPN
+    update-source loopback0
+    ebgp-multihop 2
+    address-family l2vpn evpn
+      send-community
+      send-community extended
+      route-map RM-NH-UNCHANGED out   ! next hop stays the originating VTEP
+  neighbor 10.110.240.13
+    remote-as 65213
+    description DC1-NXLF-03 EVPN
+    update-source loopback0
+    ebgp-multihop 2
+    address-family l2vpn evpn
+      send-community
+      send-community extended
+      route-map RM-NH-UNCHANGED out   ! next hop stays the originating VTEP
+  neighbor 10.110.240.14
+    remote-as 65214
+    description DC1-NXLF-04 EVPN
+    update-source loopback0
+    ebgp-multihop 2
+    address-family l2vpn evpn
+      send-community
+      send-community extended
+      route-map RM-NH-UNCHANGED out   ! next hop stays the originating VTEP
+  neighbor 10.110.240.21
+    remote-as 65215
+    description DC1-NXBGW-01 EVPN
+    update-source loopback0
+    ebgp-multihop 2
+    address-family l2vpn evpn
+      send-community
+      send-community extended
+      route-map RM-NH-UNCHANGED out   ! next hop stays the originating VTEP
+  neighbor 10.110.240.22
+    remote-as 65216
+    description DC1-NXBGW-02 EVPN
+    update-source loopback0
+    ebgp-multihop 2
+    address-family l2vpn evpn
+      send-community
+      send-community extended
+      route-map RM-NH-UNCHANGED out   ! next hop stays the originating VTEP</code></pre></details><details><summary>DC1-NXSP-02 (Spine / EVPN route server) · <a href="configs/DC1-NXSP-02.cfg">DC1-NXSP-02.cfg</a></summary><pre><code>!==============================================================================
+! DC1-NXSP-02 · Spine / EVPN route server · BGP AS 65210
+! DC1-DC2 EVPN/VXLAN Multi-Site demo fabric (BGP only). Generated by fabric_design.
+! FICTIONAL DEMO DATA: not for any real network.
+! Template: validate against the exact Nexus model and NX-OS release before use.
+! Fill in every &lt;placeholder&gt;. Host-gateway SVIs ship shut (migration step M4).
+! Not included: AAA/TACACS, NTP, SNMP, syslog, banners, users. Apply your own baseline.
+!==============================================================================
+
+hostname DC1-NXSP-02
+
+! ---- out-of-band management (10.110.245.0/24, gateway on the firewall) ---
+vrf context management
+  ip route 0.0.0.0/0 10.110.245.1
+interface mgmt0
+  vrf member management
+  ip address 10.110.245.12/24
+
+nv overlay evpn
+feature bgp
+feature bfd
+
+route-map RM-NH-UNCHANGED permit 10
+  set ip next-hop unchanged
+
+interface loopback0
+  description Router-ID / EVPN peering
+  ip address 10.110.240.2/32
+
+interface Ethernet1/1
+  description DC1-NXLF-01 Eth1/50
+  no switchport
+  mtu 9216
+  no ip redirects
+  ip address 10.110.242.32/31
+  no shutdown
+
+interface Ethernet1/2
+  description DC1-NXLF-02 Eth1/50
+  no switchport
+  mtu 9216
+  no ip redirects
+  ip address 10.110.242.34/31
+  no shutdown
+
+interface Ethernet1/3
+  description DC1-NXLF-03 Eth1/50
+  no switchport
+  mtu 9216
+  no ip redirects
+  ip address 10.110.242.36/31
+  no shutdown
+
+interface Ethernet1/4
+  description DC1-NXLF-04 Eth1/50
+  no switchport
+  mtu 9216
+  no ip redirects
+  ip address 10.110.242.38/31
+  no shutdown
+
+interface Ethernet1/5
+  description DC1-NXBGW-01 Eth1/50
+  no switchport
+  mtu 9216
+  no ip redirects
+  ip address 10.110.242.40/31
+  no shutdown
+
+interface Ethernet1/6
+  description DC1-NXBGW-02 Eth1/50
+  no switchport
+  mtu 9216
+  no ip redirects
+  ip address 10.110.242.42/31
+  no shutdown
+
+router bgp 65210
+  router-id 10.110.240.2
+  bestpath as-path multipath-relax
+  address-family ipv4 unicast
+    network 10.110.240.2/32
+    maximum-paths 8
+  address-family l2vpn evpn
+    retain route-target all          ! no VRFs here; keep every EVPN route to pass on
+  neighbor 10.110.242.33
+    remote-as 65211
+    description DC1-NXLF-01 underlay
+    bfd
+    address-family ipv4 unicast
+  neighbor 10.110.242.35
+    remote-as 65212
+    description DC1-NXLF-02 underlay
+    bfd
+    address-family ipv4 unicast
+  neighbor 10.110.242.37
+    remote-as 65213
+    description DC1-NXLF-03 underlay
+    bfd
+    address-family ipv4 unicast
+  neighbor 10.110.242.39
+    remote-as 65214
+    description DC1-NXLF-04 underlay
+    bfd
+    address-family ipv4 unicast
+  neighbor 10.110.242.41
+    remote-as 65215
+    description DC1-NXBGW-01 underlay
+    bfd
+    address-family ipv4 unicast
+  neighbor 10.110.242.43
+    remote-as 65216
+    description DC1-NXBGW-02 underlay
+    bfd
+    address-family ipv4 unicast
+  neighbor 10.110.240.11
+    remote-as 65211
+    description DC1-NXLF-01 EVPN
+    update-source loopback0
+    ebgp-multihop 2
+    address-family l2vpn evpn
+      send-community
+      send-community extended
+      route-map RM-NH-UNCHANGED out   ! next hop stays the originating VTEP
+  neighbor 10.110.240.12
+    remote-as 65212
+    description DC1-NXLF-02 EVPN
+    update-source loopback0
+    ebgp-multihop 2
+    address-family l2vpn evpn
+      send-community
+      send-community extended
+      route-map RM-NH-UNCHANGED out   ! next hop stays the originating VTEP
+  neighbor 10.110.240.13
+    remote-as 65213
+    description DC1-NXLF-03 EVPN
+    update-source loopback0
+    ebgp-multihop 2
+    address-family l2vpn evpn
+      send-community
+      send-community extended
+      route-map RM-NH-UNCHANGED out   ! next hop stays the originating VTEP
+  neighbor 10.110.240.14
+    remote-as 65214
+    description DC1-NXLF-04 EVPN
+    update-source loopback0
+    ebgp-multihop 2
+    address-family l2vpn evpn
+      send-community
+      send-community extended
+      route-map RM-NH-UNCHANGED out   ! next hop stays the originating VTEP
+  neighbor 10.110.240.21
+    remote-as 65215
+    description DC1-NXBGW-01 EVPN
+    update-source loopback0
+    ebgp-multihop 2
+    address-family l2vpn evpn
+      send-community
+      send-community extended
+      route-map RM-NH-UNCHANGED out   ! next hop stays the originating VTEP
+  neighbor 10.110.240.22
+    remote-as 65216
+    description DC1-NXBGW-02 EVPN
+    update-source loopback0
+    ebgp-multihop 2
+    address-family l2vpn evpn
+      send-community
+      send-community extended
+      route-map RM-NH-UNCHANGED out   ! next hop stays the originating VTEP</code></pre></details><details><summary>DC1-NXLF-01 (Leaf / VTEP) · <a href="configs/DC1-NXLF-01.cfg">DC1-NXLF-01.cfg</a></summary><pre><code>!==============================================================================
+! DC1-NXLF-01 · Leaf / VTEP · BGP AS 65211
+! DC1-DC2 EVPN/VXLAN Multi-Site demo fabric (BGP only). Generated by fabric_design.
+! FICTIONAL DEMO DATA: not for any real network.
+! Template: validate against the exact Nexus model and NX-OS release before use.
+! Fill in every &lt;placeholder&gt;. Host-gateway SVIs ship shut (migration step M4).
+! Not included: AAA/TACACS, NTP, SNMP, syslog, banners, users. Apply your own baseline.
+!==============================================================================
+
+hostname DC1-NXLF-01
+
+! ---- out-of-band management (10.110.245.0/24, gateway on the firewall) ---
+vrf context management
+  ip route 0.0.0.0/0 10.110.245.1
+interface mgmt0
+  vrf member management
+  ip address 10.110.245.21/24
+
+nv overlay evpn
+feature bgp
+feature bfd
+feature interface-vlan
+feature vn-segment-vlan-based
+feature nv overlay
+feature vpc
+feature lacp
+fabric forwarding anycast-gateway-mac 2020.0000.00aa
+
+! ---- underlay (eBGP, AS 65211) ---------------------------------------
+interface loopback0
+  description Router-ID / EVPN peering
+  ip address 10.110.240.11/32
+
+interface loopback1
+  description VTEP (primary) + vPC anycast VTEP (secondary)
+  ip address 10.110.241.11/32
+  ip address 10.110.241.101/32 secondary
+
+interface Ethernet1/49
+  description DC1-NXSP-01 Eth1/1
+  no switchport
+  mtu 9216
+  no ip redirects
+  ip address 10.110.242.1/31
+  no shutdown
+
+interface Ethernet1/50
+  description DC1-NXSP-02 Eth1/1
+  no switchport
+  mtu 9216
+  no ip redirects
+  ip address 10.110.242.33/31
+  no shutdown
+
+! ---- vPC ---------------------------------------------------------------
+vrf context KEEPALIVE
+
+interface Ethernet1/48
+  description vPC keepalive to DC1-NXLF-02
+  no switchport
+  vrf member KEEPALIVE
+  ip address 10.110.243.1/30
+  no shutdown
+
+spanning-tree vlan 1-3967 priority 8192
+
+vpc domain 111
+  peer-switch
+  role priority 10
+  peer-keepalive destination 10.110.243.2 source 10.110.243.1 vrf KEEPALIVE
+  peer-gateway
+  ip arp synchronize
+
+interface port-channel10
+  description vPC peer-link to DC1-NXLF-02
+  switchport mode trunk
+  spanning-tree port type network
+  vpc peer-link
+
+interface Ethernet1/53-54
+  description vPC peer-link
+  switchport mode trunk
+  channel-group 10 mode active
+  no shutdown
+
+vlan 3900
+  name VPC-BACKUP-UNDERLAY
+system nve infra-vlans 3900
+
+interface Vlan3900
+  description vPC backup underlay to DC1-NXLF-02 (eBGP)
+  no shutdown
+  mtu 9216
+  no ip redirects
+  ip address 10.110.243.5/30
+
+! ---- tenant VRF and L3VNI ---------------------------------------------
+vrf context TRUST
+  vni 50010
+  rd auto
+  address-family ipv4 unicast
+    route-target both 65000:50010
+    route-target both 65000:50010 evpn
+
+vlan 3910
+  name L3VNI-TRUST
+  vn-segment 50010
+
+interface Vlan3910
+  description L3VNI TRUST
+  no shutdown
+  mtu 9216
+  vrf member TRUST
+  no ip redirects
+  ip forward
+
+! ---- host VLANs: same VLAN ID, subnet and .1 gateway as today ----------
+! Every routed VLAN from section 6.1. Prune to the VLANs whose hosts attach to this pair.
+
+vlan 10
+  name MGMT
+  vn-segment 110010
+vlan 20
+  name SERVERS-20
+  vn-segment 110020
+vlan 30
+  name APP-30
+  vn-segment 110030
+vlan 40
+  name DB-40
+  vn-segment 110040
+vlan 100
+  name STORAGE-100
+  vn-segment 110100
+
+interface Vlan10
+  description MGMT (anycast gateway)
+  shutdown                        ! no shutdown at this VLAN&#x27;s gateway cut-over (migration M4)
+  mtu 9216
+  vrf member TRUST
+  no ip redirects
+  ip address 10.110.10.1/24
+  fabric forwarding mode anycast-gateway
+
+interface Vlan20
+  description SERVERS-20 (anycast gateway)
+  shutdown                        ! no shutdown at this VLAN&#x27;s gateway cut-over (migration M4)
+  mtu 9216
+  vrf member TRUST
+  no ip redirects
+  ip address 10.110.20.1/24
+  fabric forwarding mode anycast-gateway
+
+interface Vlan30
+  description APP-30 (anycast gateway)
+  shutdown                        ! no shutdown at this VLAN&#x27;s gateway cut-over (migration M4)
+  mtu 9216
+  vrf member TRUST
+  no ip redirects
+  ip address 10.110.30.1/24
+  fabric forwarding mode anycast-gateway
+
+interface Vlan40
+  description DB-40 (anycast gateway)
+  shutdown                        ! no shutdown at this VLAN&#x27;s gateway cut-over (migration M4)
+  mtu 9216
+  vrf member TRUST
+  no ip redirects
+  ip address 10.110.40.1/24
+  fabric forwarding mode anycast-gateway
+
+interface Vlan100
+  description STORAGE-100 (anycast gateway)
+  shutdown                        ! no shutdown at this VLAN&#x27;s gateway cut-over (migration M4)
+  mtu 9216
+  vrf member TRUST
+  no ip redirects
+  ip address 10.110.100.1/24
+  fabric forwarding mode anycast-gateway
+
+! Explicit RTs: with a different ASN per leaf, &#x27;auto&#x27; would give every leaf a different RT.
+evpn
+  vni 110010 l2
+    rd auto
+    route-target import 65110:110010
+    route-target export 65110:110010
+  vni 110020 l2
+    rd auto
+    route-target import 65110:110020
+    route-target export 65110:110020
+  vni 110030 l2
+    rd auto
+    route-target import 65110:110030
+    route-target export 65110:110030
+  vni 110040 l2
+    rd auto
+    route-target import 65110:110040
+    route-target export 65110:110040
+  vni 110100 l2
+    rd auto
+    route-target import 65110:110100
+    route-target export 65110:110100
+
+! ARP suppression needs TCAM space on -EX/-FX platforms first (then reload):
+!   hardware access-list tcam region arp-ether 256 double-wide
+interface nve1
+  no shutdown
+  host-reachability protocol bgp
+  source-interface loopback1
+  advertise virtual-rmac
+  global ingress-replication protocol bgp
+  global suppress-arp
+  member vni 50010 associate-vrf
+  member vni 110010
+  member vni 110020
+  member vni 110030
+  member vni 110040
+  member vni 110100
+
+! ---- BGP: underlay + overlay ------------------------------------------
+ip prefix-list PL-DC1-SITE seq 10 permit 10.110.0.0/16 le 32
+route-map RM-DIRECT permit 10
+  match ip address prefix-list PL-DC1-SITE
+
+router bgp 65211
+  router-id 10.110.240.11
+  bestpath as-path multipath-relax
+  address-family ipv4 unicast
+    network 10.110.240.11/32
+    network 10.110.241.11/32
+    network 10.110.241.101/32
+    maximum-paths 4
+  address-family l2vpn evpn
+    advertise-pip
+  neighbor 10.110.242.0
+    remote-as 65210
+    description DC1-NXSP-01 underlay
+    bfd
+    address-family ipv4 unicast
+  neighbor 10.110.242.32
+    remote-as 65210
+    description DC1-NXSP-02 underlay
+    bfd
+    address-family ipv4 unicast
+  neighbor 10.110.243.6
+    remote-as 65212
+    description DC1-NXLF-02 vPC backup underlay
+    bfd
+    address-family ipv4 unicast
+  neighbor 10.110.240.1
+    remote-as 65210
+    description DC1-NXSP-01 EVPN
+    update-source loopback0
+    ebgp-multihop 2
+    address-family l2vpn evpn
+      send-community
+      send-community extended
+  neighbor 10.110.240.2
+    remote-as 65210
+    description DC1-NXSP-02 EVPN
+    update-source loopback0
+    ebgp-multihop 2
+    address-family l2vpn evpn
+      send-community
+      send-community extended
+  vrf TRUST
+    address-family ipv4 unicast
+      redistribute direct route-map RM-DIRECT
+      maximum-paths 4</code></pre></details><details><summary>DC1-NXLF-02 (Leaf / VTEP) · <a href="configs/DC1-NXLF-02.cfg">DC1-NXLF-02.cfg</a></summary><pre><code>!==============================================================================
+! DC1-NXLF-02 · Leaf / VTEP · BGP AS 65212
+! DC1-DC2 EVPN/VXLAN Multi-Site demo fabric (BGP only). Generated by fabric_design.
+! FICTIONAL DEMO DATA: not for any real network.
+! Template: validate against the exact Nexus model and NX-OS release before use.
+! Fill in every &lt;placeholder&gt;. Host-gateway SVIs ship shut (migration step M4).
+! Not included: AAA/TACACS, NTP, SNMP, syslog, banners, users. Apply your own baseline.
+!==============================================================================
+
+hostname DC1-NXLF-02
+
+! ---- out-of-band management (10.110.245.0/24, gateway on the firewall) ---
+vrf context management
+  ip route 0.0.0.0/0 10.110.245.1
+interface mgmt0
+  vrf member management
+  ip address 10.110.245.22/24
+
+nv overlay evpn
+feature bgp
+feature bfd
+feature interface-vlan
+feature vn-segment-vlan-based
+feature nv overlay
+feature vpc
+feature lacp
+fabric forwarding anycast-gateway-mac 2020.0000.00aa
+
+! ---- underlay (eBGP, AS 65212) ---------------------------------------
+interface loopback0
+  description Router-ID / EVPN peering
+  ip address 10.110.240.12/32
+
+interface loopback1
+  description VTEP (primary) + vPC anycast VTEP (secondary)
+  ip address 10.110.241.12/32
+  ip address 10.110.241.101/32 secondary
+
+interface Ethernet1/49
+  description DC1-NXSP-01 Eth1/2
+  no switchport
+  mtu 9216
+  no ip redirects
+  ip address 10.110.242.3/31
+  no shutdown
+
+interface Ethernet1/50
+  description DC1-NXSP-02 Eth1/2
+  no switchport
+  mtu 9216
+  no ip redirects
+  ip address 10.110.242.35/31
+  no shutdown
+
+! ---- vPC ---------------------------------------------------------------
+vrf context KEEPALIVE
+
+interface Ethernet1/48
+  description vPC keepalive to DC1-NXLF-01
+  no switchport
+  vrf member KEEPALIVE
+  ip address 10.110.243.2/30
+  no shutdown
+
+spanning-tree vlan 1-3967 priority 8192
+
+vpc domain 111
+  peer-switch
+  role priority 20
+  peer-keepalive destination 10.110.243.1 source 10.110.243.2 vrf KEEPALIVE
+  peer-gateway
+  ip arp synchronize
+
+interface port-channel10
+  description vPC peer-link to DC1-NXLF-01
+  switchport mode trunk
+  spanning-tree port type network
+  vpc peer-link
+
+interface Ethernet1/53-54
+  description vPC peer-link
+  switchport mode trunk
+  channel-group 10 mode active
+  no shutdown
+
+vlan 3900
+  name VPC-BACKUP-UNDERLAY
+system nve infra-vlans 3900
+
+interface Vlan3900
+  description vPC backup underlay to DC1-NXLF-01 (eBGP)
+  no shutdown
+  mtu 9216
+  no ip redirects
+  ip address 10.110.243.6/30
+
+! ---- tenant VRF and L3VNI ---------------------------------------------
+vrf context TRUST
+  vni 50010
+  rd auto
+  address-family ipv4 unicast
+    route-target both 65000:50010
+    route-target both 65000:50010 evpn
+
+vlan 3910
+  name L3VNI-TRUST
+  vn-segment 50010
+
+interface Vlan3910
+  description L3VNI TRUST
+  no shutdown
+  mtu 9216
+  vrf member TRUST
+  no ip redirects
+  ip forward
+
+! ---- host VLANs: same VLAN ID, subnet and .1 gateway as today ----------
+! Every routed VLAN from section 6.1. Prune to the VLANs whose hosts attach to this pair.
+
+vlan 10
+  name MGMT
+  vn-segment 110010
+vlan 20
+  name SERVERS-20
+  vn-segment 110020
+vlan 30
+  name APP-30
+  vn-segment 110030
+vlan 40
+  name DB-40
+  vn-segment 110040
+vlan 100
+  name STORAGE-100
+  vn-segment 110100
+
+interface Vlan10
+  description MGMT (anycast gateway)
+  shutdown                        ! no shutdown at this VLAN&#x27;s gateway cut-over (migration M4)
+  mtu 9216
+  vrf member TRUST
+  no ip redirects
+  ip address 10.110.10.1/24
+  fabric forwarding mode anycast-gateway
+
+interface Vlan20
+  description SERVERS-20 (anycast gateway)
+  shutdown                        ! no shutdown at this VLAN&#x27;s gateway cut-over (migration M4)
+  mtu 9216
+  vrf member TRUST
+  no ip redirects
+  ip address 10.110.20.1/24
+  fabric forwarding mode anycast-gateway
+
+interface Vlan30
+  description APP-30 (anycast gateway)
+  shutdown                        ! no shutdown at this VLAN&#x27;s gateway cut-over (migration M4)
+  mtu 9216
+  vrf member TRUST
+  no ip redirects
+  ip address 10.110.30.1/24
+  fabric forwarding mode anycast-gateway
+
+interface Vlan40
+  description DB-40 (anycast gateway)
+  shutdown                        ! no shutdown at this VLAN&#x27;s gateway cut-over (migration M4)
+  mtu 9216
+  vrf member TRUST
+  no ip redirects
+  ip address 10.110.40.1/24
+  fabric forwarding mode anycast-gateway
+
+interface Vlan100
+  description STORAGE-100 (anycast gateway)
+  shutdown                        ! no shutdown at this VLAN&#x27;s gateway cut-over (migration M4)
+  mtu 9216
+  vrf member TRUST
+  no ip redirects
+  ip address 10.110.100.1/24
+  fabric forwarding mode anycast-gateway
+
+! Explicit RTs: with a different ASN per leaf, &#x27;auto&#x27; would give every leaf a different RT.
+evpn
+  vni 110010 l2
+    rd auto
+    route-target import 65110:110010
+    route-target export 65110:110010
+  vni 110020 l2
+    rd auto
+    route-target import 65110:110020
+    route-target export 65110:110020
+  vni 110030 l2
+    rd auto
+    route-target import 65110:110030
+    route-target export 65110:110030
+  vni 110040 l2
+    rd auto
+    route-target import 65110:110040
+    route-target export 65110:110040
+  vni 110100 l2
+    rd auto
+    route-target import 65110:110100
+    route-target export 65110:110100
+
+! ARP suppression needs TCAM space on -EX/-FX platforms first (then reload):
+!   hardware access-list tcam region arp-ether 256 double-wide
+interface nve1
+  no shutdown
+  host-reachability protocol bgp
+  source-interface loopback1
+  advertise virtual-rmac
+  global ingress-replication protocol bgp
+  global suppress-arp
+  member vni 50010 associate-vrf
+  member vni 110010
+  member vni 110020
+  member vni 110030
+  member vni 110040
+  member vni 110100
+
+! ---- BGP: underlay + overlay ------------------------------------------
+ip prefix-list PL-DC1-SITE seq 10 permit 10.110.0.0/16 le 32
+route-map RM-DIRECT permit 10
+  match ip address prefix-list PL-DC1-SITE
+
+router bgp 65212
+  router-id 10.110.240.12
+  bestpath as-path multipath-relax
+  address-family ipv4 unicast
+    network 10.110.240.12/32
+    network 10.110.241.12/32
+    network 10.110.241.101/32
+    maximum-paths 4
+  address-family l2vpn evpn
+    advertise-pip
+  neighbor 10.110.242.2
+    remote-as 65210
+    description DC1-NXSP-01 underlay
+    bfd
+    address-family ipv4 unicast
+  neighbor 10.110.242.34
+    remote-as 65210
+    description DC1-NXSP-02 underlay
+    bfd
+    address-family ipv4 unicast
+  neighbor 10.110.243.5
+    remote-as 65211
+    description DC1-NXLF-01 vPC backup underlay
+    bfd
+    address-family ipv4 unicast
+  neighbor 10.110.240.1
+    remote-as 65210
+    description DC1-NXSP-01 EVPN
+    update-source loopback0
+    ebgp-multihop 2
+    address-family l2vpn evpn
+      send-community
+      send-community extended
+  neighbor 10.110.240.2
+    remote-as 65210
+    description DC1-NXSP-02 EVPN
+    update-source loopback0
+    ebgp-multihop 2
+    address-family l2vpn evpn
+      send-community
+      send-community extended
+  vrf TRUST
+    address-family ipv4 unicast
+      redistribute direct route-map RM-DIRECT
+      maximum-paths 4</code></pre></details><details><summary>DC1-NXLF-03 (Border-service leaf / VTEP) · <a href="configs/DC1-NXLF-03.cfg">DC1-NXLF-03.cfg</a></summary><pre><code>!==============================================================================
+! DC1-NXLF-03 · Border-service leaf / VTEP · BGP AS 65213
+! DC1-DC2 EVPN/VXLAN Multi-Site demo fabric (BGP only). Generated by fabric_design.
+! FICTIONAL DEMO DATA: not for any real network.
+! Template: validate against the exact Nexus model and NX-OS release before use.
+! Fill in every &lt;placeholder&gt;. Host-gateway SVIs ship shut (migration step M4).
+! Not included: AAA/TACACS, NTP, SNMP, syslog, banners, users. Apply your own baseline.
+!==============================================================================
+
+hostname DC1-NXLF-03
+
+! ---- out-of-band management (10.110.245.0/24, gateway on the firewall) ---
+vrf context management
+  ip route 0.0.0.0/0 10.110.245.1
+interface mgmt0
+  vrf member management
+  ip address 10.110.245.23/24
+
+nv overlay evpn
+feature bgp
+feature bfd
+feature interface-vlan
+feature vn-segment-vlan-based
+feature nv overlay
+feature vpc
+feature lacp
+fabric forwarding anycast-gateway-mac 2020.0000.00aa
+
+! ---- underlay (eBGP, AS 65213) ---------------------------------------
+interface loopback0
+  description Router-ID / EVPN peering
+  ip address 10.110.240.13/32
+
+interface loopback1
+  description VTEP (primary) + vPC anycast VTEP (secondary)
+  ip address 10.110.241.13/32
+  ip address 10.110.241.102/32 secondary
+
+interface Ethernet1/49
+  description DC1-NXSP-01 Eth1/3
+  no switchport
+  mtu 9216
+  no ip redirects
+  ip address 10.110.242.5/31
+  no shutdown
+
+interface Ethernet1/50
+  description DC1-NXSP-02 Eth1/3
+  no switchport
+  mtu 9216
+  no ip redirects
+  ip address 10.110.242.37/31
+  no shutdown
+
+! ---- vPC ---------------------------------------------------------------
+vrf context KEEPALIVE
+
+interface Ethernet1/48
+  description vPC keepalive to DC1-NXLF-04
+  no switchport
+  vrf member KEEPALIVE
+  ip address 10.110.243.9/30
+  no shutdown
+
+spanning-tree vlan 1-3967 priority 8192
+
+vpc domain 112
+  peer-switch
+  role priority 10
+  peer-keepalive destination 10.110.243.10 source 10.110.243.9 vrf KEEPALIVE
+  peer-gateway
+  ip arp synchronize
+
+interface port-channel10
+  description vPC peer-link to DC1-NXLF-04
+  switchport mode trunk
+  spanning-tree port type network
+  vpc peer-link
+
+interface Ethernet1/53-54
+  description vPC peer-link
+  switchport mode trunk
+  channel-group 10 mode active
+  no shutdown
+
+vlan 3900
+  name VPC-BACKUP-UNDERLAY
+system nve infra-vlans 3900
+
+interface Vlan3900
+  description vPC backup underlay to DC1-NXLF-04 (eBGP)
+  no shutdown
+  mtu 9216
+  no ip redirects
+  ip address 10.110.243.13/30
+
+! ---- tenant VRF and L3VNI ---------------------------------------------
+vrf context TRUST
+  vni 50010
+  rd auto
+  address-family ipv4 unicast
+    route-target both 65000:50010
+    route-target both 65000:50010 evpn
+
+vlan 3910
+  name L3VNI-TRUST
+  vn-segment 50010
+
+interface Vlan3910
+  description L3VNI TRUST
+  no shutdown
+  mtu 9216
+  vrf member TRUST
+  no ip redirects
+  ip forward
+
+! ---- host VLANs: same VLAN ID, subnet and .1 gateway as today ----------
+! Every routed VLAN from section 6.1. Prune to the VLANs whose hosts attach to this pair.
+
+vlan 10
+  name MGMT
+  vn-segment 110010
+vlan 20
+  name SERVERS-20
+  vn-segment 110020
+vlan 30
+  name APP-30
+  vn-segment 110030
+vlan 40
+  name DB-40
+  vn-segment 110040
+vlan 100
+  name STORAGE-100
+  vn-segment 110100
+
+interface Vlan10
+  description MGMT (anycast gateway)
+  shutdown                        ! no shutdown at this VLAN&#x27;s gateway cut-over (migration M4)
+  mtu 9216
+  vrf member TRUST
+  no ip redirects
+  ip address 10.110.10.1/24
+  fabric forwarding mode anycast-gateway
+
+interface Vlan20
+  description SERVERS-20 (anycast gateway)
+  shutdown                        ! no shutdown at this VLAN&#x27;s gateway cut-over (migration M4)
+  mtu 9216
+  vrf member TRUST
+  no ip redirects
+  ip address 10.110.20.1/24
+  fabric forwarding mode anycast-gateway
+
+interface Vlan30
+  description APP-30 (anycast gateway)
+  shutdown                        ! no shutdown at this VLAN&#x27;s gateway cut-over (migration M4)
+  mtu 9216
+  vrf member TRUST
+  no ip redirects
+  ip address 10.110.30.1/24
+  fabric forwarding mode anycast-gateway
+
+interface Vlan40
+  description DB-40 (anycast gateway)
+  shutdown                        ! no shutdown at this VLAN&#x27;s gateway cut-over (migration M4)
+  mtu 9216
+  vrf member TRUST
+  no ip redirects
+  ip address 10.110.40.1/24
+  fabric forwarding mode anycast-gateway
+
+interface Vlan100
+  description STORAGE-100 (anycast gateway)
+  shutdown                        ! no shutdown at this VLAN&#x27;s gateway cut-over (migration M4)
+  mtu 9216
+  vrf member TRUST
+  no ip redirects
+  ip address 10.110.100.1/24
+  fabric forwarding mode anycast-gateway
+
+! Explicit RTs: with a different ASN per leaf, &#x27;auto&#x27; would give every leaf a different RT.
+evpn
+  vni 110010 l2
+    rd auto
+    route-target import 65110:110010
+    route-target export 65110:110010
+  vni 110020 l2
+    rd auto
+    route-target import 65110:110020
+    route-target export 65110:110020
+  vni 110030 l2
+    rd auto
+    route-target import 65110:110030
+    route-target export 65110:110030
+  vni 110040 l2
+    rd auto
+    route-target import 65110:110040
+    route-target export 65110:110040
+  vni 110100 l2
+    rd auto
+    route-target import 65110:110100
+    route-target export 65110:110100
+
+! ARP suppression needs TCAM space on -EX/-FX platforms first (then reload):
+!   hardware access-list tcam region arp-ether 256 double-wide
+interface nve1
+  no shutdown
+  host-reachability protocol bgp
+  source-interface loopback1
+  advertise virtual-rmac
+  global ingress-replication protocol bgp
+  global suppress-arp
+  member vni 50010 associate-vrf
+  member vni 110010
+  member vni 110020
+  member vni 110030
+  member vni 110040
+  member vni 110100
+
+! ---- BGP: underlay + overlay ------------------------------------------
+ip prefix-list PL-DC1-SITE seq 10 permit 10.110.0.0/16 le 32
+route-map RM-DIRECT permit 10
+  match ip address prefix-list PL-DC1-SITE
+
+router bgp 65213
+  router-id 10.110.240.13
+  bestpath as-path multipath-relax
+  address-family ipv4 unicast
+    network 10.110.240.13/32
+    network 10.110.241.13/32
+    network 10.110.241.102/32
+    maximum-paths 4
+  address-family l2vpn evpn
+    advertise-pip
+  neighbor 10.110.242.4
+    remote-as 65210
+    description DC1-NXSP-01 underlay
+    bfd
+    address-family ipv4 unicast
+  neighbor 10.110.242.36
+    remote-as 65210
+    description DC1-NXSP-02 underlay
+    bfd
+    address-family ipv4 unicast
+  neighbor 10.110.243.14
+    remote-as 65214
+    description DC1-NXLF-04 vPC backup underlay
+    bfd
+    address-family ipv4 unicast
+  neighbor 10.110.240.1
+    remote-as 65210
+    description DC1-NXSP-01 EVPN
+    update-source loopback0
+    ebgp-multihop 2
+    address-family l2vpn evpn
+      send-community
+      send-community extended
+  neighbor 10.110.240.2
+    remote-as 65210
+    description DC1-NXSP-02 EVPN
+    update-source loopback0
+    ebgp-multihop 2
+    address-family l2vpn evpn
+      send-community
+      send-community extended
+  vrf TRUST
+    address-family ipv4 unicast
+      redistribute direct route-map RM-DIRECT
+      maximum-paths 4
+
+! ---- border-service: firewall handoff (eBGP, VRF TRUST) ---------
+! Routed transit, no ae8 and no vPC to the firewall. FW-01 and FW-02 share the HA-synced
+! address, so both firewalls&#x27; ports sit in one local VLAN; only the active one forwards.
+vlan 3011
+  name FW-TRANSIT-LF-03
+
+interface Vlan3011
+  description Firewall transit 10.110.244.64/29 (DC1-FW-01/02 ethernet1/24)
+  no shutdown
+  vrf member TRUST
+  no ip redirects
+  ip address 10.110.244.66/29          ! firewall 10.110.244.65
+
+interface Ethernet1/45
+  description DC1-FW-01 ethernet1/24
+  switchport mode access
+  switchport access vlan 3011
+  spanning-tree port type edge
+  no shutdown
+interface Ethernet1/46
+  description DC1-FW-02 ethernet1/24
+  switchport mode access
+  switchport access vlan 3011
+  spanning-tree port type edge
+  no shutdown
+
+interface port-channel10
+  switchport trunk allowed vlan remove 3011   ! local VLAN: keep it off the vPC peer-link
+
+ip prefix-list PL-DEFAULT seq 10 permit 0.0.0.0/0
+ip prefix-list PL-DC2-SITE seq 10 permit 10.120.0.0/16 le 32
+
+route-map RM-FW-IN permit 10          ! the firewall sends only the default route
+  match ip address prefix-list PL-DEFAULT
+route-map RM-FW-OUT permit 10         ! both sites&#x27; specifics (beat the firewall&#x27;s IPsec statics)
+  match ip address prefix-list PL-DC1-SITE PL-DC2-SITE
+
+! ---- migration only (M2-M5): eBGP to the legacy core over VLAN 99 -------
+! The legacy core must run BGP (AS 65218) for the migration window and
+! redistribute its connected/OSPF routes into it. Remove this block at M7.
+vlan 99
+  name LEGACY-CORE-10.110.99.0
+
+interface Vlan99
+  description Legacy core transit (migration)
+  no shutdown
+  vrf member TRUST
+  no ip redirects
+  ip address 10.110.99.11/24              ! confirm free in 10.110.99.0/24
+
+interface port-channel30
+  description Legacy core DC1-CORE-01/02 (migration)
+  switchport mode trunk
+  switchport trunk allowed vlan 99
+  spanning-tree port type normal
+  vpc 30
+  shutdown
+interface Ethernet1/43
+  description Legacy core switch 01 (migration)
+  switchport mode trunk
+  switchport trunk allowed vlan 99
+  channel-group 30 mode active
+  shutdown
+interface Ethernet1/44
+  description Legacy core switch 02 (migration)
+  switchport mode trunk
+  switchport trunk allowed vlan 99
+  channel-group 30 mode active
+  shutdown
+
+ip as-path access-list AL-DC1-FABRIC seq 10 permit &quot;_(65210|65211|65212|65213|65214|65215|65216)_&quot;
+route-map RM-LEGACY-IN deny 5         ! never take our own routes back from the core
+  match as-path AL-DC1-FABRIC
+route-map RM-LEGACY-IN permit 10      ! legacy subnets not yet migrated
+  match ip address prefix-list PL-DC1-SITE
+route-map RM-LEGACY-IN permit 20      ! legacy default until the firewall moves (M5)
+  match ip address prefix-list PL-DEFAULT
+  set local-preference 50
+route-map RM-LEGACY-OUT permit 10
+  match ip address prefix-list PL-DC1-SITE PL-DC2-SITE PL-DEFAULT
+
+router bgp 65213
+  vrf TRUST
+    neighbor 10.110.244.65
+      remote-as 65217
+      description DC1-FW (active member) ethernet1/24
+      bfd
+      address-family ipv4 unicast
+        route-map RM-FW-IN in
+        route-map RM-FW-OUT out
+        maximum-prefix 10
+    neighbor &lt;DC1-CORE-VLAN99-IP&gt;
+      remote-as 65218
+      description Legacy core (migration only)
+      shutdown
+      address-family ipv4 unicast
+        route-map RM-LEGACY-IN in
+        route-map RM-LEGACY-OUT out</code></pre></details><details><summary>DC1-NXLF-04 (Border-service leaf / VTEP) · <a href="configs/DC1-NXLF-04.cfg">DC1-NXLF-04.cfg</a></summary><pre><code>!==============================================================================
+! DC1-NXLF-04 · Border-service leaf / VTEP · BGP AS 65214
+! DC1-DC2 EVPN/VXLAN Multi-Site demo fabric (BGP only). Generated by fabric_design.
+! FICTIONAL DEMO DATA: not for any real network.
+! Template: validate against the exact Nexus model and NX-OS release before use.
+! Fill in every &lt;placeholder&gt;. Host-gateway SVIs ship shut (migration step M4).
+! Not included: AAA/TACACS, NTP, SNMP, syslog, banners, users. Apply your own baseline.
+!==============================================================================
+
+hostname DC1-NXLF-04
+
+! ---- out-of-band management (10.110.245.0/24, gateway on the firewall) ---
+vrf context management
+  ip route 0.0.0.0/0 10.110.245.1
+interface mgmt0
+  vrf member management
+  ip address 10.110.245.24/24
+
+nv overlay evpn
+feature bgp
+feature bfd
+feature interface-vlan
+feature vn-segment-vlan-based
+feature nv overlay
+feature vpc
+feature lacp
+fabric forwarding anycast-gateway-mac 2020.0000.00aa
+
+! ---- underlay (eBGP, AS 65214) ---------------------------------------
+interface loopback0
+  description Router-ID / EVPN peering
+  ip address 10.110.240.14/32
+
+interface loopback1
+  description VTEP (primary) + vPC anycast VTEP (secondary)
+  ip address 10.110.241.14/32
+  ip address 10.110.241.102/32 secondary
+
+interface Ethernet1/49
+  description DC1-NXSP-01 Eth1/4
+  no switchport
+  mtu 9216
+  no ip redirects
+  ip address 10.110.242.7/31
+  no shutdown
+
+interface Ethernet1/50
+  description DC1-NXSP-02 Eth1/4
+  no switchport
+  mtu 9216
+  no ip redirects
+  ip address 10.110.242.39/31
+  no shutdown
+
+! ---- vPC ---------------------------------------------------------------
+vrf context KEEPALIVE
+
+interface Ethernet1/48
+  description vPC keepalive to DC1-NXLF-03
+  no switchport
+  vrf member KEEPALIVE
+  ip address 10.110.243.10/30
+  no shutdown
+
+spanning-tree vlan 1-3967 priority 8192
+
+vpc domain 112
+  peer-switch
+  role priority 20
+  peer-keepalive destination 10.110.243.9 source 10.110.243.10 vrf KEEPALIVE
+  peer-gateway
+  ip arp synchronize
+
+interface port-channel10
+  description vPC peer-link to DC1-NXLF-03
+  switchport mode trunk
+  spanning-tree port type network
+  vpc peer-link
+
+interface Ethernet1/53-54
+  description vPC peer-link
+  switchport mode trunk
+  channel-group 10 mode active
+  no shutdown
+
+vlan 3900
+  name VPC-BACKUP-UNDERLAY
+system nve infra-vlans 3900
+
+interface Vlan3900
+  description vPC backup underlay to DC1-NXLF-03 (eBGP)
+  no shutdown
+  mtu 9216
+  no ip redirects
+  ip address 10.110.243.14/30
+
+! ---- tenant VRF and L3VNI ---------------------------------------------
+vrf context TRUST
+  vni 50010
+  rd auto
+  address-family ipv4 unicast
+    route-target both 65000:50010
+    route-target both 65000:50010 evpn
+
+vlan 3910
+  name L3VNI-TRUST
+  vn-segment 50010
+
+interface Vlan3910
+  description L3VNI TRUST
+  no shutdown
+  mtu 9216
+  vrf member TRUST
+  no ip redirects
+  ip forward
+
+! ---- host VLANs: same VLAN ID, subnet and .1 gateway as today ----------
+! Every routed VLAN from section 6.1. Prune to the VLANs whose hosts attach to this pair.
+
+vlan 10
+  name MGMT
+  vn-segment 110010
+vlan 20
+  name SERVERS-20
+  vn-segment 110020
+vlan 30
+  name APP-30
+  vn-segment 110030
+vlan 40
+  name DB-40
+  vn-segment 110040
+vlan 100
+  name STORAGE-100
+  vn-segment 110100
+
+interface Vlan10
+  description MGMT (anycast gateway)
+  shutdown                        ! no shutdown at this VLAN&#x27;s gateway cut-over (migration M4)
+  mtu 9216
+  vrf member TRUST
+  no ip redirects
+  ip address 10.110.10.1/24
+  fabric forwarding mode anycast-gateway
+
+interface Vlan20
+  description SERVERS-20 (anycast gateway)
+  shutdown                        ! no shutdown at this VLAN&#x27;s gateway cut-over (migration M4)
+  mtu 9216
+  vrf member TRUST
+  no ip redirects
+  ip address 10.110.20.1/24
+  fabric forwarding mode anycast-gateway
+
+interface Vlan30
+  description APP-30 (anycast gateway)
+  shutdown                        ! no shutdown at this VLAN&#x27;s gateway cut-over (migration M4)
+  mtu 9216
+  vrf member TRUST
+  no ip redirects
+  ip address 10.110.30.1/24
+  fabric forwarding mode anycast-gateway
+
+interface Vlan40
+  description DB-40 (anycast gateway)
+  shutdown                        ! no shutdown at this VLAN&#x27;s gateway cut-over (migration M4)
+  mtu 9216
+  vrf member TRUST
+  no ip redirects
+  ip address 10.110.40.1/24
+  fabric forwarding mode anycast-gateway
+
+interface Vlan100
+  description STORAGE-100 (anycast gateway)
+  shutdown                        ! no shutdown at this VLAN&#x27;s gateway cut-over (migration M4)
+  mtu 9216
+  vrf member TRUST
+  no ip redirects
+  ip address 10.110.100.1/24
+  fabric forwarding mode anycast-gateway
+
+! Explicit RTs: with a different ASN per leaf, &#x27;auto&#x27; would give every leaf a different RT.
+evpn
+  vni 110010 l2
+    rd auto
+    route-target import 65110:110010
+    route-target export 65110:110010
+  vni 110020 l2
+    rd auto
+    route-target import 65110:110020
+    route-target export 65110:110020
+  vni 110030 l2
+    rd auto
+    route-target import 65110:110030
+    route-target export 65110:110030
+  vni 110040 l2
+    rd auto
+    route-target import 65110:110040
+    route-target export 65110:110040
+  vni 110100 l2
+    rd auto
+    route-target import 65110:110100
+    route-target export 65110:110100
+
+! ARP suppression needs TCAM space on -EX/-FX platforms first (then reload):
+!   hardware access-list tcam region arp-ether 256 double-wide
+interface nve1
+  no shutdown
+  host-reachability protocol bgp
+  source-interface loopback1
+  advertise virtual-rmac
+  global ingress-replication protocol bgp
+  global suppress-arp
+  member vni 50010 associate-vrf
+  member vni 110010
+  member vni 110020
+  member vni 110030
+  member vni 110040
+  member vni 110100
+
+! ---- BGP: underlay + overlay ------------------------------------------
+ip prefix-list PL-DC1-SITE seq 10 permit 10.110.0.0/16 le 32
+route-map RM-DIRECT permit 10
+  match ip address prefix-list PL-DC1-SITE
+
+router bgp 65214
+  router-id 10.110.240.14
+  bestpath as-path multipath-relax
+  address-family ipv4 unicast
+    network 10.110.240.14/32
+    network 10.110.241.14/32
+    network 10.110.241.102/32
+    maximum-paths 4
+  address-family l2vpn evpn
+    advertise-pip
+  neighbor 10.110.242.6
+    remote-as 65210
+    description DC1-NXSP-01 underlay
+    bfd
+    address-family ipv4 unicast
+  neighbor 10.110.242.38
+    remote-as 65210
+    description DC1-NXSP-02 underlay
+    bfd
+    address-family ipv4 unicast
+  neighbor 10.110.243.13
+    remote-as 65213
+    description DC1-NXLF-03 vPC backup underlay
+    bfd
+    address-family ipv4 unicast
+  neighbor 10.110.240.1
+    remote-as 65210
+    description DC1-NXSP-01 EVPN
+    update-source loopback0
+    ebgp-multihop 2
+    address-family l2vpn evpn
+      send-community
+      send-community extended
+  neighbor 10.110.240.2
+    remote-as 65210
+    description DC1-NXSP-02 EVPN
+    update-source loopback0
+    ebgp-multihop 2
+    address-family l2vpn evpn
+      send-community
+      send-community extended
+  vrf TRUST
+    address-family ipv4 unicast
+      redistribute direct route-map RM-DIRECT
+      maximum-paths 4
+
+! ---- border-service: firewall handoff (eBGP, VRF TRUST) ---------
+! Routed transit, no ae8 and no vPC to the firewall. FW-01 and FW-02 share the HA-synced
+! address, so both firewalls&#x27; ports sit in one local VLAN; only the active one forwards.
+vlan 3012
+  name FW-TRANSIT-LF-04
+
+interface Vlan3012
+  description Firewall transit 10.110.244.72/29 (DC1-FW-01/02 ethernet1/26)
+  no shutdown
+  vrf member TRUST
+  no ip redirects
+  ip address 10.110.244.74/29          ! firewall 10.110.244.73
+
+interface Ethernet1/45
+  description DC1-FW-01 ethernet1/26
+  switchport mode access
+  switchport access vlan 3012
+  spanning-tree port type edge
+  no shutdown
+interface Ethernet1/46
+  description DC1-FW-02 ethernet1/26
+  switchport mode access
+  switchport access vlan 3012
+  spanning-tree port type edge
+  no shutdown
+
+interface port-channel10
+  switchport trunk allowed vlan remove 3012   ! local VLAN: keep it off the vPC peer-link
+
+ip prefix-list PL-DEFAULT seq 10 permit 0.0.0.0/0
+ip prefix-list PL-DC2-SITE seq 10 permit 10.120.0.0/16 le 32
+
+route-map RM-FW-IN permit 10          ! the firewall sends only the default route
+  match ip address prefix-list PL-DEFAULT
+route-map RM-FW-OUT permit 10         ! both sites&#x27; specifics (beat the firewall&#x27;s IPsec statics)
+  match ip address prefix-list PL-DC1-SITE PL-DC2-SITE
+
+! ---- migration only (M2-M5): eBGP to the legacy core over VLAN 99 -------
+! The legacy core must run BGP (AS 65218) for the migration window and
+! redistribute its connected/OSPF routes into it. Remove this block at M7.
+vlan 99
+  name LEGACY-CORE-10.110.99.0
+
+interface Vlan99
+  description Legacy core transit (migration)
+  no shutdown
+  vrf member TRUST
+  no ip redirects
+  ip address 10.110.99.12/24              ! confirm free in 10.110.99.0/24
+
+interface port-channel30
+  description Legacy core DC1-CORE-01/02 (migration)
+  switchport mode trunk
+  switchport trunk allowed vlan 99
+  spanning-tree port type normal
+  vpc 30
+  shutdown
+interface Ethernet1/43
+  description Legacy core switch 01 (migration)
+  switchport mode trunk
+  switchport trunk allowed vlan 99
+  channel-group 30 mode active
+  shutdown
+interface Ethernet1/44
+  description Legacy core switch 02 (migration)
+  switchport mode trunk
+  switchport trunk allowed vlan 99
+  channel-group 30 mode active
+  shutdown
+
+ip as-path access-list AL-DC1-FABRIC seq 10 permit &quot;_(65210|65211|65212|65213|65214|65215|65216)_&quot;
+route-map RM-LEGACY-IN deny 5         ! never take our own routes back from the core
+  match as-path AL-DC1-FABRIC
+route-map RM-LEGACY-IN permit 10      ! legacy subnets not yet migrated
+  match ip address prefix-list PL-DC1-SITE
+route-map RM-LEGACY-IN permit 20      ! legacy default until the firewall moves (M5)
+  match ip address prefix-list PL-DEFAULT
+  set local-preference 50
+route-map RM-LEGACY-OUT permit 10
+  match ip address prefix-list PL-DC1-SITE PL-DC2-SITE PL-DEFAULT
+
+router bgp 65214
+  vrf TRUST
+    neighbor 10.110.244.73
+      remote-as 65217
+      description DC1-FW (active member) ethernet1/26
+      bfd
+      address-family ipv4 unicast
+        route-map RM-FW-IN in
+        route-map RM-FW-OUT out
+        maximum-prefix 10
+    neighbor &lt;DC1-CORE-VLAN99-IP&gt;
+      remote-as 65218
+      description Legacy core (migration only)
+      shutdown
+      address-family ipv4 unicast
+        route-map RM-LEGACY-IN in
+        route-map RM-LEGACY-OUT out</code></pre></details><details><summary>DC1-NXBGW-01 (Multi-Site BGW) · <a href="configs/DC1-NXBGW-01.cfg">DC1-NXBGW-01.cfg</a></summary><pre><code>!==============================================================================
+! DC1-NXBGW-01 · Multi-Site BGW · BGP AS 65215
+! DC1-DC2 EVPN/VXLAN Multi-Site demo fabric (BGP only). Generated by fabric_design.
+! FICTIONAL DEMO DATA: not for any real network.
+! Template: validate against the exact Nexus model and NX-OS release before use.
+! Fill in every &lt;placeholder&gt;. Host-gateway SVIs ship shut (migration step M4).
+! Not included: AAA/TACACS, NTP, SNMP, syslog, banners, users. Apply your own baseline.
+!==============================================================================
+
+hostname DC1-NXBGW-01
+
+! ---- out-of-band management (10.110.245.0/24, gateway on the firewall) ---
+vrf context management
+  ip route 0.0.0.0/0 10.110.245.1
+interface mgmt0
+  vrf member management
+  ip address 10.110.245.31/24
+
+nv overlay evpn
+feature bgp
+feature bfd
+feature interface-vlan
+feature vn-segment-vlan-based
+feature nv overlay
+
+evpn multisite border-gateway 110
+  delay-restore time 300
+
+interface loopback0
+  ip address 10.110.240.21/32
+interface loopback1
+  description VTEP
+  ip address 10.110.241.21/32
+interface loopback100
+  description Multi-Site VIP (shared by both DC1 BGWs)
+  ip address 10.110.241.200/32
+
+interface Ethernet1/49
+  description DC1-NXSP-01 Eth1/5
+  no switchport
+  mtu 9216
+  no ip redirects
+  ip address 10.110.242.9/31
+  evpn multisite fabric-tracking
+  no shutdown
+interface Ethernet1/50
+  description DC1-NXSP-02 Eth1/5
+  no switchport
+  mtu 9216
+  no ip redirects
+  ip address 10.110.242.41/31
+  evpn multisite fabric-tracking
+  no shutdown
+
+interface Ethernet1/51
+  description DCI carrier A to DC2-NXBGW-01
+  no switchport
+  mtu 9216                         ! set to the carrier&#x27;s maximum if lower
+  no ip redirects
+  ip address 10.110.246.0/31
+  evpn multisite dci-tracking
+  no shutdown
+
+! ---- day-one cloud handoff (VRF TRUST) --------------------------------
+interface Ethernet1/52
+  description Cloud handoff: AWS DX connection 1 + Azure ER primary
+  no switchport
+  mtu 9216
+  no shutdown
+
+interface Ethernet1/52.&lt;AWS-VIF-VLAN&gt;
+  description AWS Direct Connect private VIF (connection 1)
+  encapsulation dot1q &lt;AWS-VIF-VLAN&gt;    ! VLAN set on the VIF / by the hosted provider
+  mtu 1500                              ! 9001 if the VIF is created with jumbo frames
+  vrf member TRUST
+  no ip redirects
+  ip address 10.110.244.1/30
+  no shutdown
+
+interface Ethernet1/52.&lt;ER-VLAN&gt;
+  description Azure ExpressRoute private peering (primary link)
+  encapsulation dot1q &lt;ER-VLAN&gt;         ! VLAN ID configured on the ER private peering
+  mtu 1500                              ! ExpressRoute MTU is 1500
+  vrf member TRUST
+  no ip redirects
+  ip address 10.110.244.17/30
+  no shutdown
+
+vrf context TRUST
+  vni 50010
+  rd auto
+  address-family ipv4 unicast
+    route-target both 65000:50010
+    route-target both 65000:50010 evpn
+vlan 3910
+  vn-segment 50010
+interface Vlan3910
+  no shutdown
+  mtu 9216
+  vrf member TRUST
+  ip forward
+
+interface nve1
+  no shutdown
+  host-reachability protocol bgp
+  source-interface loopback1
+  multisite border-gateway interface loopback100
+  member vni 50010 associate-vrf
+
+! ---- underlay filters: only BGW loopbacks cross the DCI ----------------
+ip prefix-list PL-BGW-LOCAL seq 10 permit 10.110.240.21/32
+ip prefix-list PL-BGW-LOCAL seq 20 permit 10.110.240.22/32
+ip prefix-list PL-BGW-LOCAL seq 30 permit 10.110.241.21/32
+ip prefix-list PL-BGW-LOCAL seq 40 permit 10.110.241.22/32
+ip prefix-list PL-BGW-LOCAL seq 50 permit 10.110.241.200/32
+ip prefix-list PL-BGW-REMOTE seq 10 permit 10.120.240.21/32
+ip prefix-list PL-BGW-REMOTE seq 20 permit 10.120.240.22/32
+ip prefix-list PL-BGW-REMOTE seq 30 permit 10.120.241.21/32
+ip prefix-list PL-BGW-REMOTE seq 40 permit 10.120.241.22/32
+ip prefix-list PL-BGW-REMOTE seq 50 permit 10.120.241.200/32
+route-map RM-FABRIC-UL-OUT permit 10    ! into the local fabric: own BGW loopbacks only
+  match ip address prefix-list PL-BGW-LOCAL
+route-map RM-DCI-UL-OUT permit 10
+  match ip address prefix-list PL-BGW-LOCAL
+route-map RM-DCI-UL-IN permit 10
+  match ip address prefix-list PL-BGW-REMOTE
+
+! ---- overlay filters: what may cross the DCI ---------------------------
+ip prefix-list PL-DC1-SITE seq 10 permit 10.110.0.0/16 le 32
+ip prefix-list PL-DC2-SITE seq 10 permit 10.120.0.0/16 le 32
+ip prefix-list PL-CLOUD-AWS seq 10 permit 10.200.0.0/16 le 24
+ip prefix-list PL-CLOUD-AZURE seq 10 permit 10.210.0.0/16 le 24
+ip prefix-list PL-TO-CLOUD seq 10 permit 10.110.0.0/16
+ip prefix-list PL-TO-CLOUD-BACKUP seq 10 permit 10.120.0.0/16
+
+route-map RM-DCI-EVPN-OUT permit 10     ! own site prefixes; never 0.0.0.0/0
+  match ip address prefix-list PL-DC1-SITE
+route-map RM-DCI-EVPN-OUT permit 20     ! cloud prefixes learned at this site (type-5)
+  match ip address prefix-list PL-CLOUD-AWS PL-CLOUD-AZURE
+route-map RM-DCI-EVPN-IN permit 10
+  match ip address prefix-list PL-DC2-SITE
+route-map RM-DCI-EVPN-IN permit 20
+  match ip address prefix-list PL-CLOUD-AWS PL-CLOUD-AZURE
+
+! ---- what may be exchanged with AWS / Azure ----------------------------
+route-map RM-AWS-IN permit 10           ! approved VPC CIDRs only; no default, no on-prem prefixes
+  match ip address prefix-list PL-CLOUD-AWS
+route-map RM-AZURE-IN permit 10         ! approved VNet CIDRs only
+  match ip address prefix-list PL-CLOUD-AZURE
+route-map RM-TO-CLOUD permit 10         ! this site&#x27;s /16, preferred
+  match ip address prefix-list PL-TO-CLOUD
+route-map RM-TO-CLOUD permit 20         ! the other site&#x27;s /16 as backup over the DCI
+  match ip address prefix-list PL-TO-CLOUD-BACKUP
+  set as-path prepend 65215 65215 65215
+
+router bgp 65215
+  router-id 10.110.240.21
+  bestpath as-path multipath-relax
+  address-family ipv4 unicast
+    network 10.110.240.21/32
+    network 10.110.241.21/32
+    network 10.110.241.200/32
+    maximum-paths 4
+  address-family l2vpn evpn
+  ! local fabric: eBGP underlay on the links, eBGP EVPN to the spine loopbacks
+  neighbor 10.110.242.8
+    remote-as 65210
+    description DC1-NXSP-01 underlay
+    bfd
+    address-family ipv4 unicast
+      route-map RM-FABRIC-UL-OUT out
+  neighbor 10.110.242.40
+    remote-as 65210
+    description DC1-NXSP-02 underlay
+    bfd
+    address-family ipv4 unicast
+      route-map RM-FABRIC-UL-OUT out
+  neighbor 10.110.240.1
+    remote-as 65210
+    description DC1-NXSP-01 EVPN
+    update-source loopback0
+    ebgp-multihop 2
+    address-family l2vpn evpn
+      send-community
+      send-community extended
+  neighbor 10.110.240.2
+    remote-as 65210
+    description DC1-NXSP-02 EVPN
+    update-source loopback0
+    ebgp-multihop 2
+    address-family l2vpn evpn
+      send-community
+      send-community extended
+  ! DCI underlay (carrier A)
+  neighbor 10.110.246.1
+    remote-as 65225
+    description DC2-NXBGW-01 underlay
+    bfd
+    address-family ipv4 unicast
+      route-map RM-DCI-UL-IN in
+      route-map RM-DCI-UL-OUT out
+  ! DCI overlay to both remote BGWs
+  neighbor 10.120.240.21
+    remote-as 65225
+    description DC2-NXBGW-01 EVPN
+    update-source loopback0
+    ebgp-multihop 5
+    peer-type fabric-external
+    address-family l2vpn evpn
+      send-community
+      send-community extended
+      route-map RM-DCI-EVPN-IN in
+      route-map RM-DCI-EVPN-OUT out
+  neighbor 10.120.240.22
+    remote-as 65226
+    description DC2-NXBGW-02 EVPN
+    update-source loopback0
+    ebgp-multihop 5
+    peer-type fabric-external
+    address-family l2vpn evpn
+      send-community
+      send-community extended
+      route-map RM-DCI-EVPN-IN in
+      route-map RM-DCI-EVPN-OUT out
+  ! cloud peerings: learned prefixes become type-5 routes in the local fabric and, through
+  ! RM-DCI-EVPN-OUT, at the other site (which prefers its own cloud links: shorter AS path)
+  vrf TRUST
+    address-family ipv4 unicast
+      aggregate-address 10.110.0.0/16
+      aggregate-address 10.120.0.0/16
+      maximum-paths 4
+    neighbor 10.110.244.2
+      remote-as 64512
+      description AWS Direct Connect private VIF (connection 1)
+      password &lt;BGP MD5 key from Secret Server&gt;
+      bfd
+      address-family ipv4 unicast
+        route-map RM-AWS-IN in
+        route-map RM-TO-CLOUD out
+        maximum-prefix 100 warning-only
+    neighbor 10.110.244.18
+      remote-as 12076
+      description Azure ExpressRoute private peering (primary link)
+      bfd
+      address-family ipv4 unicast
+        route-map RM-AZURE-IN in
+        route-map RM-TO-CLOUD out
+        maximum-prefix 100 warning-only</code></pre></details><details><summary>DC1-NXBGW-02 (Multi-Site BGW) · <a href="configs/DC1-NXBGW-02.cfg">DC1-NXBGW-02.cfg</a></summary><pre><code>!==============================================================================
+! DC1-NXBGW-02 · Multi-Site BGW · BGP AS 65216
+! DC1-DC2 EVPN/VXLAN Multi-Site demo fabric (BGP only). Generated by fabric_design.
+! FICTIONAL DEMO DATA: not for any real network.
+! Template: validate against the exact Nexus model and NX-OS release before use.
+! Fill in every &lt;placeholder&gt;. Host-gateway SVIs ship shut (migration step M4).
+! Not included: AAA/TACACS, NTP, SNMP, syslog, banners, users. Apply your own baseline.
+!==============================================================================
+
+hostname DC1-NXBGW-02
+
+! ---- out-of-band management (10.110.245.0/24, gateway on the firewall) ---
+vrf context management
+  ip route 0.0.0.0/0 10.110.245.1
+interface mgmt0
+  vrf member management
+  ip address 10.110.245.32/24
+
+nv overlay evpn
+feature bgp
+feature bfd
+feature interface-vlan
+feature vn-segment-vlan-based
+feature nv overlay
+
+evpn multisite border-gateway 110
+  delay-restore time 300
+
+interface loopback0
+  ip address 10.110.240.22/32
+interface loopback1
+  description VTEP
+  ip address 10.110.241.22/32
+interface loopback100
+  description Multi-Site VIP (shared by both DC1 BGWs)
+  ip address 10.110.241.200/32
+
+interface Ethernet1/49
+  description DC1-NXSP-01 Eth1/6
+  no switchport
+  mtu 9216
+  no ip redirects
+  ip address 10.110.242.11/31
+  evpn multisite fabric-tracking
+  no shutdown
+interface Ethernet1/50
+  description DC1-NXSP-02 Eth1/6
+  no switchport
+  mtu 9216
+  no ip redirects
+  ip address 10.110.242.43/31
+  evpn multisite fabric-tracking
+  no shutdown
+
+interface Ethernet1/51
+  description DCI carrier B to DC2-NXBGW-02
+  no switchport
+  mtu 9216                         ! set to the carrier&#x27;s maximum if lower
+  no ip redirects
+  ip address 10.120.246.1/31
+  evpn multisite dci-tracking
+  no shutdown
+
+! ---- day-one cloud handoff (VRF TRUST) --------------------------------
+interface Ethernet1/52
+  description Cloud handoff: AWS DX connection 2 + Azure ER secondary
+  no switchport
+  mtu 9216
+  no shutdown
+
+interface Ethernet1/52.&lt;AWS-VIF-VLAN&gt;
+  description AWS Direct Connect private VIF (connection 2)
+  encapsulation dot1q &lt;AWS-VIF-VLAN&gt;    ! VLAN set on the VIF / by the hosted provider
+  mtu 1500                              ! 9001 if the VIF is created with jumbo frames
+  vrf member TRUST
+  no ip redirects
+  ip address 10.110.244.9/30
+  no shutdown
+
+interface Ethernet1/52.&lt;ER-VLAN&gt;
+  description Azure ExpressRoute private peering (secondary link)
+  encapsulation dot1q &lt;ER-VLAN&gt;         ! VLAN ID configured on the ER private peering
+  mtu 1500                              ! ExpressRoute MTU is 1500
+  vrf member TRUST
+  no ip redirects
+  ip address 10.110.244.21/30
+  no shutdown
+
+vrf context TRUST
+  vni 50010
+  rd auto
+  address-family ipv4 unicast
+    route-target both 65000:50010
+    route-target both 65000:50010 evpn
+vlan 3910
+  vn-segment 50010
+interface Vlan3910
+  no shutdown
+  mtu 9216
+  vrf member TRUST
+  ip forward
+
+interface nve1
+  no shutdown
+  host-reachability protocol bgp
+  source-interface loopback1
+  multisite border-gateway interface loopback100
+  member vni 50010 associate-vrf
+
+! ---- underlay filters: only BGW loopbacks cross the DCI ----------------
+ip prefix-list PL-BGW-LOCAL seq 10 permit 10.110.240.21/32
+ip prefix-list PL-BGW-LOCAL seq 20 permit 10.110.240.22/32
+ip prefix-list PL-BGW-LOCAL seq 30 permit 10.110.241.21/32
+ip prefix-list PL-BGW-LOCAL seq 40 permit 10.110.241.22/32
+ip prefix-list PL-BGW-LOCAL seq 50 permit 10.110.241.200/32
+ip prefix-list PL-BGW-REMOTE seq 10 permit 10.120.240.21/32
+ip prefix-list PL-BGW-REMOTE seq 20 permit 10.120.240.22/32
+ip prefix-list PL-BGW-REMOTE seq 30 permit 10.120.241.21/32
+ip prefix-list PL-BGW-REMOTE seq 40 permit 10.120.241.22/32
+ip prefix-list PL-BGW-REMOTE seq 50 permit 10.120.241.200/32
+route-map RM-FABRIC-UL-OUT permit 10    ! into the local fabric: own BGW loopbacks only
+  match ip address prefix-list PL-BGW-LOCAL
+route-map RM-DCI-UL-OUT permit 10
+  match ip address prefix-list PL-BGW-LOCAL
+route-map RM-DCI-UL-IN permit 10
+  match ip address prefix-list PL-BGW-REMOTE
+
+! ---- overlay filters: what may cross the DCI ---------------------------
+ip prefix-list PL-DC1-SITE seq 10 permit 10.110.0.0/16 le 32
+ip prefix-list PL-DC2-SITE seq 10 permit 10.120.0.0/16 le 32
+ip prefix-list PL-CLOUD-AWS seq 10 permit 10.200.0.0/16 le 24
+ip prefix-list PL-CLOUD-AZURE seq 10 permit 10.210.0.0/16 le 24
+ip prefix-list PL-TO-CLOUD seq 10 permit 10.110.0.0/16
+ip prefix-list PL-TO-CLOUD-BACKUP seq 10 permit 10.120.0.0/16
+
+route-map RM-DCI-EVPN-OUT permit 10     ! own site prefixes; never 0.0.0.0/0
+  match ip address prefix-list PL-DC1-SITE
+route-map RM-DCI-EVPN-OUT permit 20     ! cloud prefixes learned at this site (type-5)
+  match ip address prefix-list PL-CLOUD-AWS PL-CLOUD-AZURE
+route-map RM-DCI-EVPN-IN permit 10
+  match ip address prefix-list PL-DC2-SITE
+route-map RM-DCI-EVPN-IN permit 20
+  match ip address prefix-list PL-CLOUD-AWS PL-CLOUD-AZURE
+
+! ---- what may be exchanged with AWS / Azure ----------------------------
+route-map RM-AWS-IN permit 10           ! approved VPC CIDRs only; no default, no on-prem prefixes
+  match ip address prefix-list PL-CLOUD-AWS
+route-map RM-AZURE-IN permit 10         ! approved VNet CIDRs only
+  match ip address prefix-list PL-CLOUD-AZURE
+route-map RM-TO-CLOUD permit 10         ! this site&#x27;s /16, preferred
+  match ip address prefix-list PL-TO-CLOUD
+route-map RM-TO-CLOUD permit 20         ! the other site&#x27;s /16 as backup over the DCI
+  match ip address prefix-list PL-TO-CLOUD-BACKUP
+  set as-path prepend 65216 65216 65216
+
+router bgp 65216
+  router-id 10.110.240.22
+  bestpath as-path multipath-relax
+  address-family ipv4 unicast
+    network 10.110.240.22/32
+    network 10.110.241.22/32
+    network 10.110.241.200/32
+    maximum-paths 4
+  address-family l2vpn evpn
+  ! local fabric: eBGP underlay on the links, eBGP EVPN to the spine loopbacks
+  neighbor 10.110.242.10
+    remote-as 65210
+    description DC1-NXSP-01 underlay
+    bfd
+    address-family ipv4 unicast
+      route-map RM-FABRIC-UL-OUT out
+  neighbor 10.110.242.42
+    remote-as 65210
+    description DC1-NXSP-02 underlay
+    bfd
+    address-family ipv4 unicast
+      route-map RM-FABRIC-UL-OUT out
+  neighbor 10.110.240.1
+    remote-as 65210
+    description DC1-NXSP-01 EVPN
+    update-source loopback0
+    ebgp-multihop 2
+    address-family l2vpn evpn
+      send-community
+      send-community extended
+  neighbor 10.110.240.2
+    remote-as 65210
+    description DC1-NXSP-02 EVPN
+    update-source loopback0
+    ebgp-multihop 2
+    address-family l2vpn evpn
+      send-community
+      send-community extended
+  ! DCI underlay (carrier B)
+  neighbor 10.120.246.0
+    remote-as 65226
+    description DC2-NXBGW-02 underlay
+    bfd
+    address-family ipv4 unicast
+      route-map RM-DCI-UL-IN in
+      route-map RM-DCI-UL-OUT out
+  ! DCI overlay to both remote BGWs
+  neighbor 10.120.240.21
+    remote-as 65225
+    description DC2-NXBGW-01 EVPN
+    update-source loopback0
+    ebgp-multihop 5
+    peer-type fabric-external
+    address-family l2vpn evpn
+      send-community
+      send-community extended
+      route-map RM-DCI-EVPN-IN in
+      route-map RM-DCI-EVPN-OUT out
+  neighbor 10.120.240.22
+    remote-as 65226
+    description DC2-NXBGW-02 EVPN
+    update-source loopback0
+    ebgp-multihop 5
+    peer-type fabric-external
+    address-family l2vpn evpn
+      send-community
+      send-community extended
+      route-map RM-DCI-EVPN-IN in
+      route-map RM-DCI-EVPN-OUT out
+  ! cloud peerings: learned prefixes become type-5 routes in the local fabric and, through
+  ! RM-DCI-EVPN-OUT, at the other site (which prefers its own cloud links: shorter AS path)
+  vrf TRUST
+    address-family ipv4 unicast
+      aggregate-address 10.110.0.0/16
+      aggregate-address 10.120.0.0/16
+      maximum-paths 4
+    neighbor 10.110.244.10
+      remote-as 64512
+      description AWS Direct Connect private VIF (connection 2)
+      password &lt;BGP MD5 key from Secret Server&gt;
+      bfd
+      address-family ipv4 unicast
+        route-map RM-AWS-IN in
+        route-map RM-TO-CLOUD out
+        maximum-prefix 100 warning-only
+    neighbor 10.110.244.22
+      remote-as 12076
+      description Azure ExpressRoute private peering (secondary link)
+      bfd
+      address-family ipv4 unicast
+        route-map RM-AZURE-IN in
+        route-map RM-TO-CLOUD out
+        maximum-prefix 100 warning-only</code></pre></details><h3>DC2</h3><details><summary>DC2-NXSP-01 (Spine / EVPN route server) · <a href="configs/DC2-NXSP-01.cfg">DC2-NXSP-01.cfg</a></summary><pre><code>!==============================================================================
+! DC2-NXSP-01 · Spine / EVPN route server · BGP AS 65220
+! DC1-DC2 EVPN/VXLAN Multi-Site demo fabric (BGP only). Generated by fabric_design.
+! FICTIONAL DEMO DATA: not for any real network.
+! Template: validate against the exact Nexus model and NX-OS release before use.
+! Fill in every &lt;placeholder&gt;. Host-gateway SVIs ship shut (migration step M4).
+! Not included: AAA/TACACS, NTP, SNMP, syslog, banners, users. Apply your own baseline.
+!==============================================================================
+
+hostname DC2-NXSP-01
+
+! ---- out-of-band management (10.120.245.0/24, gateway on the firewall) ---
+vrf context management
+  ip route 0.0.0.0/0 10.120.245.1
+interface mgmt0
+  vrf member management
+  ip address 10.120.245.11/24
+
+nv overlay evpn
+feature bgp
+feature bfd
+
+route-map RM-NH-UNCHANGED permit 10
+  set ip next-hop unchanged
+
+interface loopback0
+  description Router-ID / EVPN peering
+  ip address 10.120.240.1/32
+
+interface Ethernet1/1
+  description DC2-NXLF-01 Eth1/49
+  no switchport
+  mtu 9216
+  no ip redirects
+  ip address 10.120.242.0/31
+  no shutdown
+
+interface Ethernet1/2
+  description DC2-NXLF-02 Eth1/49
+  no switchport
+  mtu 9216
+  no ip redirects
+  ip address 10.120.242.2/31
+  no shutdown
+
+interface Ethernet1/3
+  description DC2-NXLF-03 Eth1/49
+  no switchport
+  mtu 9216
+  no ip redirects
+  ip address 10.120.242.4/31
+  no shutdown
+
+interface Ethernet1/4
+  description DC2-NXLF-04 Eth1/49
+  no switchport
+  mtu 9216
+  no ip redirects
+  ip address 10.120.242.6/31
+  no shutdown
+
+interface Ethernet1/5
+  description DC2-NXBGW-01 Eth1/49
+  no switchport
+  mtu 9216
+  no ip redirects
+  ip address 10.120.242.8/31
+  no shutdown
+
+interface Ethernet1/6
+  description DC2-NXBGW-02 Eth1/49
+  no switchport
+  mtu 9216
+  no ip redirects
+  ip address 10.120.242.10/31
+  no shutdown
+
+router bgp 65220
+  router-id 10.120.240.1
+  bestpath as-path multipath-relax
+  address-family ipv4 unicast
+    network 10.120.240.1/32
+    maximum-paths 8
+  address-family l2vpn evpn
+    retain route-target all          ! no VRFs here; keep every EVPN route to pass on
+  neighbor 10.120.242.1
+    remote-as 65221
+    description DC2-NXLF-01 underlay
+    bfd
+    address-family ipv4 unicast
+  neighbor 10.120.242.3
+    remote-as 65222
+    description DC2-NXLF-02 underlay
+    bfd
+    address-family ipv4 unicast
+  neighbor 10.120.242.5
+    remote-as 65223
+    description DC2-NXLF-03 underlay
+    bfd
+    address-family ipv4 unicast
+  neighbor 10.120.242.7
+    remote-as 65224
+    description DC2-NXLF-04 underlay
+    bfd
+    address-family ipv4 unicast
+  neighbor 10.120.242.9
+    remote-as 65225
+    description DC2-NXBGW-01 underlay
+    bfd
+    address-family ipv4 unicast
+  neighbor 10.120.242.11
+    remote-as 65226
+    description DC2-NXBGW-02 underlay
+    bfd
+    address-family ipv4 unicast
+  neighbor 10.120.240.11
+    remote-as 65221
+    description DC2-NXLF-01 EVPN
+    update-source loopback0
+    ebgp-multihop 2
+    address-family l2vpn evpn
+      send-community
+      send-community extended
+      route-map RM-NH-UNCHANGED out   ! next hop stays the originating VTEP
+  neighbor 10.120.240.12
+    remote-as 65222
+    description DC2-NXLF-02 EVPN
+    update-source loopback0
+    ebgp-multihop 2
+    address-family l2vpn evpn
+      send-community
+      send-community extended
+      route-map RM-NH-UNCHANGED out   ! next hop stays the originating VTEP
+  neighbor 10.120.240.13
+    remote-as 65223
+    description DC2-NXLF-03 EVPN
+    update-source loopback0
+    ebgp-multihop 2
+    address-family l2vpn evpn
+      send-community
+      send-community extended
+      route-map RM-NH-UNCHANGED out   ! next hop stays the originating VTEP
+  neighbor 10.120.240.14
+    remote-as 65224
+    description DC2-NXLF-04 EVPN
+    update-source loopback0
+    ebgp-multihop 2
+    address-family l2vpn evpn
+      send-community
+      send-community extended
+      route-map RM-NH-UNCHANGED out   ! next hop stays the originating VTEP
+  neighbor 10.120.240.21
+    remote-as 65225
+    description DC2-NXBGW-01 EVPN
+    update-source loopback0
+    ebgp-multihop 2
+    address-family l2vpn evpn
+      send-community
+      send-community extended
+      route-map RM-NH-UNCHANGED out   ! next hop stays the originating VTEP
+  neighbor 10.120.240.22
+    remote-as 65226
+    description DC2-NXBGW-02 EVPN
+    update-source loopback0
+    ebgp-multihop 2
+    address-family l2vpn evpn
+      send-community
+      send-community extended
+      route-map RM-NH-UNCHANGED out   ! next hop stays the originating VTEP</code></pre></details><details><summary>DC2-NXSP-02 (Spine / EVPN route server) · <a href="configs/DC2-NXSP-02.cfg">DC2-NXSP-02.cfg</a></summary><pre><code>!==============================================================================
+! DC2-NXSP-02 · Spine / EVPN route server · BGP AS 65220
+! DC1-DC2 EVPN/VXLAN Multi-Site demo fabric (BGP only). Generated by fabric_design.
+! FICTIONAL DEMO DATA: not for any real network.
+! Template: validate against the exact Nexus model and NX-OS release before use.
+! Fill in every &lt;placeholder&gt;. Host-gateway SVIs ship shut (migration step M4).
+! Not included: AAA/TACACS, NTP, SNMP, syslog, banners, users. Apply your own baseline.
+!==============================================================================
+
+hostname DC2-NXSP-02
+
+! ---- out-of-band management (10.120.245.0/24, gateway on the firewall) ---
+vrf context management
+  ip route 0.0.0.0/0 10.120.245.1
+interface mgmt0
+  vrf member management
+  ip address 10.120.245.12/24
+
+nv overlay evpn
+feature bgp
+feature bfd
+
+route-map RM-NH-UNCHANGED permit 10
+  set ip next-hop unchanged
+
+interface loopback0
+  description Router-ID / EVPN peering
+  ip address 10.120.240.2/32
+
+interface Ethernet1/1
+  description DC2-NXLF-01 Eth1/50
+  no switchport
+  mtu 9216
+  no ip redirects
+  ip address 10.120.242.32/31
+  no shutdown
+
+interface Ethernet1/2
+  description DC2-NXLF-02 Eth1/50
+  no switchport
+  mtu 9216
+  no ip redirects
+  ip address 10.120.242.34/31
+  no shutdown
+
+interface Ethernet1/3
+  description DC2-NXLF-03 Eth1/50
+  no switchport
+  mtu 9216
+  no ip redirects
+  ip address 10.120.242.36/31
+  no shutdown
+
+interface Ethernet1/4
+  description DC2-NXLF-04 Eth1/50
+  no switchport
+  mtu 9216
+  no ip redirects
+  ip address 10.120.242.38/31
+  no shutdown
+
+interface Ethernet1/5
+  description DC2-NXBGW-01 Eth1/50
+  no switchport
+  mtu 9216
+  no ip redirects
+  ip address 10.120.242.40/31
+  no shutdown
+
+interface Ethernet1/6
+  description DC2-NXBGW-02 Eth1/50
+  no switchport
+  mtu 9216
+  no ip redirects
+  ip address 10.120.242.42/31
+  no shutdown
+
+router bgp 65220
+  router-id 10.120.240.2
+  bestpath as-path multipath-relax
+  address-family ipv4 unicast
+    network 10.120.240.2/32
+    maximum-paths 8
+  address-family l2vpn evpn
+    retain route-target all          ! no VRFs here; keep every EVPN route to pass on
+  neighbor 10.120.242.33
+    remote-as 65221
+    description DC2-NXLF-01 underlay
+    bfd
+    address-family ipv4 unicast
+  neighbor 10.120.242.35
+    remote-as 65222
+    description DC2-NXLF-02 underlay
+    bfd
+    address-family ipv4 unicast
+  neighbor 10.120.242.37
+    remote-as 65223
+    description DC2-NXLF-03 underlay
+    bfd
+    address-family ipv4 unicast
+  neighbor 10.120.242.39
+    remote-as 65224
+    description DC2-NXLF-04 underlay
+    bfd
+    address-family ipv4 unicast
+  neighbor 10.120.242.41
+    remote-as 65225
+    description DC2-NXBGW-01 underlay
+    bfd
+    address-family ipv4 unicast
+  neighbor 10.120.242.43
+    remote-as 65226
+    description DC2-NXBGW-02 underlay
+    bfd
+    address-family ipv4 unicast
+  neighbor 10.120.240.11
+    remote-as 65221
+    description DC2-NXLF-01 EVPN
+    update-source loopback0
+    ebgp-multihop 2
+    address-family l2vpn evpn
+      send-community
+      send-community extended
+      route-map RM-NH-UNCHANGED out   ! next hop stays the originating VTEP
+  neighbor 10.120.240.12
+    remote-as 65222
+    description DC2-NXLF-02 EVPN
+    update-source loopback0
+    ebgp-multihop 2
+    address-family l2vpn evpn
+      send-community
+      send-community extended
+      route-map RM-NH-UNCHANGED out   ! next hop stays the originating VTEP
+  neighbor 10.120.240.13
+    remote-as 65223
+    description DC2-NXLF-03 EVPN
+    update-source loopback0
+    ebgp-multihop 2
+    address-family l2vpn evpn
+      send-community
+      send-community extended
+      route-map RM-NH-UNCHANGED out   ! next hop stays the originating VTEP
+  neighbor 10.120.240.14
+    remote-as 65224
+    description DC2-NXLF-04 EVPN
+    update-source loopback0
+    ebgp-multihop 2
+    address-family l2vpn evpn
+      send-community
+      send-community extended
+      route-map RM-NH-UNCHANGED out   ! next hop stays the originating VTEP
+  neighbor 10.120.240.21
+    remote-as 65225
+    description DC2-NXBGW-01 EVPN
+    update-source loopback0
+    ebgp-multihop 2
+    address-family l2vpn evpn
+      send-community
+      send-community extended
+      route-map RM-NH-UNCHANGED out   ! next hop stays the originating VTEP
+  neighbor 10.120.240.22
+    remote-as 65226
+    description DC2-NXBGW-02 EVPN
+    update-source loopback0
+    ebgp-multihop 2
+    address-family l2vpn evpn
+      send-community
+      send-community extended
+      route-map RM-NH-UNCHANGED out   ! next hop stays the originating VTEP</code></pre></details><details><summary>DC2-NXLF-01 (Leaf / VTEP) · <a href="configs/DC2-NXLF-01.cfg">DC2-NXLF-01.cfg</a></summary><pre><code>!==============================================================================
+! DC2-NXLF-01 · Leaf / VTEP · BGP AS 65221
+! DC1-DC2 EVPN/VXLAN Multi-Site demo fabric (BGP only). Generated by fabric_design.
+! FICTIONAL DEMO DATA: not for any real network.
+! Template: validate against the exact Nexus model and NX-OS release before use.
+! Fill in every &lt;placeholder&gt;. Host-gateway SVIs ship shut (migration step M4).
+! Not included: AAA/TACACS, NTP, SNMP, syslog, banners, users. Apply your own baseline.
+!==============================================================================
+
+hostname DC2-NXLF-01
+
+! ---- out-of-band management (10.120.245.0/24, gateway on the firewall) ---
+vrf context management
+  ip route 0.0.0.0/0 10.120.245.1
+interface mgmt0
+  vrf member management
+  ip address 10.120.245.21/24
+
+nv overlay evpn
+feature bgp
+feature bfd
+feature interface-vlan
+feature vn-segment-vlan-based
+feature nv overlay
+feature vpc
+feature lacp
+fabric forwarding anycast-gateway-mac 2020.0000.00aa
+
+! ---- underlay (eBGP, AS 65221) ---------------------------------------
+interface loopback0
+  description Router-ID / EVPN peering
+  ip address 10.120.240.11/32
+
+interface loopback1
+  description VTEP (primary) + vPC anycast VTEP (secondary)
+  ip address 10.120.241.11/32
+  ip address 10.120.241.101/32 secondary
+
+interface Ethernet1/49
+  description DC2-NXSP-01 Eth1/1
+  no switchport
+  mtu 9216
+  no ip redirects
+  ip address 10.120.242.1/31
+  no shutdown
+
+interface Ethernet1/50
+  description DC2-NXSP-02 Eth1/1
+  no switchport
+  mtu 9216
+  no ip redirects
+  ip address 10.120.242.33/31
+  no shutdown
+
+! ---- vPC ---------------------------------------------------------------
+vrf context KEEPALIVE
+
+interface Ethernet1/48
+  description vPC keepalive to DC2-NXLF-02
+  no switchport
+  vrf member KEEPALIVE
+  ip address 10.120.243.1/30
+  no shutdown
+
+spanning-tree vlan 1-3967 priority 8192
+
+vpc domain 121
+  peer-switch
+  role priority 10
+  peer-keepalive destination 10.120.243.2 source 10.120.243.1 vrf KEEPALIVE
+  peer-gateway
+  ip arp synchronize
+
+interface port-channel10
+  description vPC peer-link to DC2-NXLF-02
+  switchport mode trunk
+  spanning-tree port type network
+  vpc peer-link
+
+interface Ethernet1/53-54
+  description vPC peer-link
+  switchport mode trunk
+  channel-group 10 mode active
+  no shutdown
+
+vlan 3900
+  name VPC-BACKUP-UNDERLAY
+system nve infra-vlans 3900
+
+interface Vlan3900
+  description vPC backup underlay to DC2-NXLF-02 (eBGP)
+  no shutdown
+  mtu 9216
+  no ip redirects
+  ip address 10.120.243.5/30
+
+! ---- tenant VRF and L3VNI ---------------------------------------------
+vrf context TRUST
+  vni 50010
+  rd auto
+  address-family ipv4 unicast
+    route-target both 65000:50010
+    route-target both 65000:50010 evpn
+
+vlan 3910
+  name L3VNI-TRUST
+  vn-segment 50010
+
+interface Vlan3910
+  description L3VNI TRUST
+  no shutdown
+  mtu 9216
+  vrf member TRUST
+  no ip redirects
+  ip forward
+
+! ---- host VLANs: same VLAN ID, subnet and .1 gateway as today ----------
+! Every routed VLAN from section 6.1. Prune to the VLANs whose hosts attach to this pair.
+
+vlan 10
+  name MGMT
+  vn-segment 120010
+vlan 20
+  name SERVERS-20
+  vn-segment 120020
+vlan 30
+  name APP-30
+  vn-segment 120030
+vlan 40
+  name DB-40
+  vn-segment 120040
+vlan 100
+  name STORAGE-100
+  vn-segment 120100
+
+interface Vlan10
+  description MGMT (anycast gateway)
+  shutdown                        ! no shutdown at this VLAN&#x27;s gateway cut-over (migration M4)
+  mtu 9216
+  vrf member TRUST
+  no ip redirects
+  ip address 10.120.10.1/24
+  fabric forwarding mode anycast-gateway
+
+interface Vlan20
+  description SERVERS-20 (anycast gateway)
+  shutdown                        ! no shutdown at this VLAN&#x27;s gateway cut-over (migration M4)
+  mtu 9216
+  vrf member TRUST
+  no ip redirects
+  ip address 10.120.20.1/24
+  fabric forwarding mode anycast-gateway
+
+interface Vlan30
+  description APP-30 (anycast gateway)
+  shutdown                        ! no shutdown at this VLAN&#x27;s gateway cut-over (migration M4)
+  mtu 9216
+  vrf member TRUST
+  no ip redirects
+  ip address 10.120.30.1/24
+  fabric forwarding mode anycast-gateway
+
+interface Vlan40
+  description DB-40 (anycast gateway)
+  shutdown                        ! no shutdown at this VLAN&#x27;s gateway cut-over (migration M4)
+  mtu 9216
+  vrf member TRUST
+  no ip redirects
+  ip address 10.120.40.1/24
+  fabric forwarding mode anycast-gateway
+
+interface Vlan100
+  description STORAGE-100 (anycast gateway)
+  shutdown                        ! no shutdown at this VLAN&#x27;s gateway cut-over (migration M4)
+  mtu 9216
+  vrf member TRUST
+  no ip redirects
+  ip address 10.120.100.1/24
+  fabric forwarding mode anycast-gateway
+
+! Explicit RTs: with a different ASN per leaf, &#x27;auto&#x27; would give every leaf a different RT.
+evpn
+  vni 120010 l2
+    rd auto
+    route-target import 65120:120010
+    route-target export 65120:120010
+  vni 120020 l2
+    rd auto
+    route-target import 65120:120020
+    route-target export 65120:120020
+  vni 120030 l2
+    rd auto
+    route-target import 65120:120030
+    route-target export 65120:120030
+  vni 120040 l2
+    rd auto
+    route-target import 65120:120040
+    route-target export 65120:120040
+  vni 120100 l2
+    rd auto
+    route-target import 65120:120100
+    route-target export 65120:120100
+
+! ARP suppression needs TCAM space on -EX/-FX platforms first (then reload):
+!   hardware access-list tcam region arp-ether 256 double-wide
+interface nve1
+  no shutdown
+  host-reachability protocol bgp
+  source-interface loopback1
+  advertise virtual-rmac
+  global ingress-replication protocol bgp
+  global suppress-arp
+  member vni 50010 associate-vrf
+  member vni 120010
+  member vni 120020
+  member vni 120030
+  member vni 120040
+  member vni 120100
+
+! ---- BGP: underlay + overlay ------------------------------------------
+ip prefix-list PL-DC2-SITE seq 10 permit 10.120.0.0/16 le 32
+route-map RM-DIRECT permit 10
+  match ip address prefix-list PL-DC2-SITE
+
+router bgp 65221
+  router-id 10.120.240.11
+  bestpath as-path multipath-relax
+  address-family ipv4 unicast
+    network 10.120.240.11/32
+    network 10.120.241.11/32
+    network 10.120.241.101/32
+    maximum-paths 4
+  address-family l2vpn evpn
+    advertise-pip
+  neighbor 10.120.242.0
+    remote-as 65220
+    description DC2-NXSP-01 underlay
+    bfd
+    address-family ipv4 unicast
+  neighbor 10.120.242.32
+    remote-as 65220
+    description DC2-NXSP-02 underlay
+    bfd
+    address-family ipv4 unicast
+  neighbor 10.120.243.6
+    remote-as 65222
+    description DC2-NXLF-02 vPC backup underlay
+    bfd
+    address-family ipv4 unicast
+  neighbor 10.120.240.1
+    remote-as 65220
+    description DC2-NXSP-01 EVPN
+    update-source loopback0
+    ebgp-multihop 2
+    address-family l2vpn evpn
+      send-community
+      send-community extended
+  neighbor 10.120.240.2
+    remote-as 65220
+    description DC2-NXSP-02 EVPN
+    update-source loopback0
+    ebgp-multihop 2
+    address-family l2vpn evpn
+      send-community
+      send-community extended
+  vrf TRUST
+    address-family ipv4 unicast
+      redistribute direct route-map RM-DIRECT
+      maximum-paths 4</code></pre></details><details><summary>DC2-NXLF-02 (Leaf / VTEP) · <a href="configs/DC2-NXLF-02.cfg">DC2-NXLF-02.cfg</a></summary><pre><code>!==============================================================================
+! DC2-NXLF-02 · Leaf / VTEP · BGP AS 65222
+! DC1-DC2 EVPN/VXLAN Multi-Site demo fabric (BGP only). Generated by fabric_design.
+! FICTIONAL DEMO DATA: not for any real network.
+! Template: validate against the exact Nexus model and NX-OS release before use.
+! Fill in every &lt;placeholder&gt;. Host-gateway SVIs ship shut (migration step M4).
+! Not included: AAA/TACACS, NTP, SNMP, syslog, banners, users. Apply your own baseline.
+!==============================================================================
+
+hostname DC2-NXLF-02
+
+! ---- out-of-band management (10.120.245.0/24, gateway on the firewall) ---
+vrf context management
+  ip route 0.0.0.0/0 10.120.245.1
+interface mgmt0
+  vrf member management
+  ip address 10.120.245.22/24
+
+nv overlay evpn
+feature bgp
+feature bfd
+feature interface-vlan
+feature vn-segment-vlan-based
+feature nv overlay
+feature vpc
+feature lacp
+fabric forwarding anycast-gateway-mac 2020.0000.00aa
+
+! ---- underlay (eBGP, AS 65222) ---------------------------------------
+interface loopback0
+  description Router-ID / EVPN peering
+  ip address 10.120.240.12/32
+
+interface loopback1
+  description VTEP (primary) + vPC anycast VTEP (secondary)
+  ip address 10.120.241.12/32
+  ip address 10.120.241.101/32 secondary
+
+interface Ethernet1/49
+  description DC2-NXSP-01 Eth1/2
+  no switchport
+  mtu 9216
+  no ip redirects
+  ip address 10.120.242.3/31
+  no shutdown
+
+interface Ethernet1/50
+  description DC2-NXSP-02 Eth1/2
+  no switchport
+  mtu 9216
+  no ip redirects
+  ip address 10.120.242.35/31
+  no shutdown
+
+! ---- vPC ---------------------------------------------------------------
+vrf context KEEPALIVE
+
+interface Ethernet1/48
+  description vPC keepalive to DC2-NXLF-01
+  no switchport
+  vrf member KEEPALIVE
+  ip address 10.120.243.2/30
+  no shutdown
+
+spanning-tree vlan 1-3967 priority 8192
+
+vpc domain 121
+  peer-switch
+  role priority 20
+  peer-keepalive destination 10.120.243.1 source 10.120.243.2 vrf KEEPALIVE
+  peer-gateway
+  ip arp synchronize
+
+interface port-channel10
+  description vPC peer-link to DC2-NXLF-01
+  switchport mode trunk
+  spanning-tree port type network
+  vpc peer-link
+
+interface Ethernet1/53-54
+  description vPC peer-link
+  switchport mode trunk
+  channel-group 10 mode active
+  no shutdown
+
+vlan 3900
+  name VPC-BACKUP-UNDERLAY
+system nve infra-vlans 3900
+
+interface Vlan3900
+  description vPC backup underlay to DC2-NXLF-01 (eBGP)
+  no shutdown
+  mtu 9216
+  no ip redirects
+  ip address 10.120.243.6/30
+
+! ---- tenant VRF and L3VNI ---------------------------------------------
+vrf context TRUST
+  vni 50010
+  rd auto
+  address-family ipv4 unicast
+    route-target both 65000:50010
+    route-target both 65000:50010 evpn
+
+vlan 3910
+  name L3VNI-TRUST
+  vn-segment 50010
+
+interface Vlan3910
+  description L3VNI TRUST
+  no shutdown
+  mtu 9216
+  vrf member TRUST
+  no ip redirects
+  ip forward
+
+! ---- host VLANs: same VLAN ID, subnet and .1 gateway as today ----------
+! Every routed VLAN from section 6.1. Prune to the VLANs whose hosts attach to this pair.
+
+vlan 10
+  name MGMT
+  vn-segment 120010
+vlan 20
+  name SERVERS-20
+  vn-segment 120020
+vlan 30
+  name APP-30
+  vn-segment 120030
+vlan 40
+  name DB-40
+  vn-segment 120040
+vlan 100
+  name STORAGE-100
+  vn-segment 120100
+
+interface Vlan10
+  description MGMT (anycast gateway)
+  shutdown                        ! no shutdown at this VLAN&#x27;s gateway cut-over (migration M4)
+  mtu 9216
+  vrf member TRUST
+  no ip redirects
+  ip address 10.120.10.1/24
+  fabric forwarding mode anycast-gateway
+
+interface Vlan20
+  description SERVERS-20 (anycast gateway)
+  shutdown                        ! no shutdown at this VLAN&#x27;s gateway cut-over (migration M4)
+  mtu 9216
+  vrf member TRUST
+  no ip redirects
+  ip address 10.120.20.1/24
+  fabric forwarding mode anycast-gateway
+
+interface Vlan30
+  description APP-30 (anycast gateway)
+  shutdown                        ! no shutdown at this VLAN&#x27;s gateway cut-over (migration M4)
+  mtu 9216
+  vrf member TRUST
+  no ip redirects
+  ip address 10.120.30.1/24
+  fabric forwarding mode anycast-gateway
+
+interface Vlan40
+  description DB-40 (anycast gateway)
+  shutdown                        ! no shutdown at this VLAN&#x27;s gateway cut-over (migration M4)
+  mtu 9216
+  vrf member TRUST
+  no ip redirects
+  ip address 10.120.40.1/24
+  fabric forwarding mode anycast-gateway
+
+interface Vlan100
+  description STORAGE-100 (anycast gateway)
+  shutdown                        ! no shutdown at this VLAN&#x27;s gateway cut-over (migration M4)
+  mtu 9216
+  vrf member TRUST
+  no ip redirects
+  ip address 10.120.100.1/24
+  fabric forwarding mode anycast-gateway
+
+! Explicit RTs: with a different ASN per leaf, &#x27;auto&#x27; would give every leaf a different RT.
+evpn
+  vni 120010 l2
+    rd auto
+    route-target import 65120:120010
+    route-target export 65120:120010
+  vni 120020 l2
+    rd auto
+    route-target import 65120:120020
+    route-target export 65120:120020
+  vni 120030 l2
+    rd auto
+    route-target import 65120:120030
+    route-target export 65120:120030
+  vni 120040 l2
+    rd auto
+    route-target import 65120:120040
+    route-target export 65120:120040
+  vni 120100 l2
+    rd auto
+    route-target import 65120:120100
+    route-target export 65120:120100
+
+! ARP suppression needs TCAM space on -EX/-FX platforms first (then reload):
+!   hardware access-list tcam region arp-ether 256 double-wide
+interface nve1
+  no shutdown
+  host-reachability protocol bgp
+  source-interface loopback1
+  advertise virtual-rmac
+  global ingress-replication protocol bgp
+  global suppress-arp
+  member vni 50010 associate-vrf
+  member vni 120010
+  member vni 120020
+  member vni 120030
+  member vni 120040
+  member vni 120100
+
+! ---- BGP: underlay + overlay ------------------------------------------
+ip prefix-list PL-DC2-SITE seq 10 permit 10.120.0.0/16 le 32
+route-map RM-DIRECT permit 10
+  match ip address prefix-list PL-DC2-SITE
+
+router bgp 65222
+  router-id 10.120.240.12
+  bestpath as-path multipath-relax
+  address-family ipv4 unicast
+    network 10.120.240.12/32
+    network 10.120.241.12/32
+    network 10.120.241.101/32
+    maximum-paths 4
+  address-family l2vpn evpn
+    advertise-pip
+  neighbor 10.120.242.2
+    remote-as 65220
+    description DC2-NXSP-01 underlay
+    bfd
+    address-family ipv4 unicast
+  neighbor 10.120.242.34
+    remote-as 65220
+    description DC2-NXSP-02 underlay
+    bfd
+    address-family ipv4 unicast
+  neighbor 10.120.243.5
+    remote-as 65221
+    description DC2-NXLF-01 vPC backup underlay
+    bfd
+    address-family ipv4 unicast
+  neighbor 10.120.240.1
+    remote-as 65220
+    description DC2-NXSP-01 EVPN
+    update-source loopback0
+    ebgp-multihop 2
+    address-family l2vpn evpn
+      send-community
+      send-community extended
+  neighbor 10.120.240.2
+    remote-as 65220
+    description DC2-NXSP-02 EVPN
+    update-source loopback0
+    ebgp-multihop 2
+    address-family l2vpn evpn
+      send-community
+      send-community extended
+  vrf TRUST
+    address-family ipv4 unicast
+      redistribute direct route-map RM-DIRECT
+      maximum-paths 4</code></pre></details><details><summary>DC2-NXLF-03 (Border-service leaf / VTEP) · <a href="configs/DC2-NXLF-03.cfg">DC2-NXLF-03.cfg</a></summary><pre><code>!==============================================================================
+! DC2-NXLF-03 · Border-service leaf / VTEP · BGP AS 65223
+! DC1-DC2 EVPN/VXLAN Multi-Site demo fabric (BGP only). Generated by fabric_design.
+! FICTIONAL DEMO DATA: not for any real network.
+! Template: validate against the exact Nexus model and NX-OS release before use.
+! Fill in every &lt;placeholder&gt;. Host-gateway SVIs ship shut (migration step M4).
+! Not included: AAA/TACACS, NTP, SNMP, syslog, banners, users. Apply your own baseline.
+!==============================================================================
+
+hostname DC2-NXLF-03
+
+! ---- out-of-band management (10.120.245.0/24, gateway on the firewall) ---
+vrf context management
+  ip route 0.0.0.0/0 10.120.245.1
+interface mgmt0
+  vrf member management
+  ip address 10.120.245.23/24
+
+nv overlay evpn
+feature bgp
+feature bfd
+feature interface-vlan
+feature vn-segment-vlan-based
+feature nv overlay
+feature vpc
+feature lacp
+fabric forwarding anycast-gateway-mac 2020.0000.00aa
+
+! ---- underlay (eBGP, AS 65223) ---------------------------------------
+interface loopback0
+  description Router-ID / EVPN peering
+  ip address 10.120.240.13/32
+
+interface loopback1
+  description VTEP (primary) + vPC anycast VTEP (secondary)
+  ip address 10.120.241.13/32
+  ip address 10.120.241.102/32 secondary
+
+interface Ethernet1/49
+  description DC2-NXSP-01 Eth1/3
+  no switchport
+  mtu 9216
+  no ip redirects
+  ip address 10.120.242.5/31
+  no shutdown
+
+interface Ethernet1/50
+  description DC2-NXSP-02 Eth1/3
+  no switchport
+  mtu 9216
+  no ip redirects
+  ip address 10.120.242.37/31
+  no shutdown
+
+! ---- vPC ---------------------------------------------------------------
+vrf context KEEPALIVE
+
+interface Ethernet1/48
+  description vPC keepalive to DC2-NXLF-04
+  no switchport
+  vrf member KEEPALIVE
+  ip address 10.120.243.9/30
+  no shutdown
+
+spanning-tree vlan 1-3967 priority 8192
+
+vpc domain 122
+  peer-switch
+  role priority 10
+  peer-keepalive destination 10.120.243.10 source 10.120.243.9 vrf KEEPALIVE
+  peer-gateway
+  ip arp synchronize
+
+interface port-channel10
+  description vPC peer-link to DC2-NXLF-04
+  switchport mode trunk
+  spanning-tree port type network
+  vpc peer-link
+
+interface Ethernet1/53-54
+  description vPC peer-link
+  switchport mode trunk
+  channel-group 10 mode active
+  no shutdown
+
+vlan 3900
+  name VPC-BACKUP-UNDERLAY
+system nve infra-vlans 3900
+
+interface Vlan3900
+  description vPC backup underlay to DC2-NXLF-04 (eBGP)
+  no shutdown
+  mtu 9216
+  no ip redirects
+  ip address 10.120.243.13/30
+
+! ---- tenant VRF and L3VNI ---------------------------------------------
+vrf context TRUST
+  vni 50010
+  rd auto
+  address-family ipv4 unicast
+    route-target both 65000:50010
+    route-target both 65000:50010 evpn
+
+vlan 3910
+  name L3VNI-TRUST
+  vn-segment 50010
+
+interface Vlan3910
+  description L3VNI TRUST
+  no shutdown
+  mtu 9216
+  vrf member TRUST
+  no ip redirects
+  ip forward
+
+! ---- host VLANs: same VLAN ID, subnet and .1 gateway as today ----------
+! Every routed VLAN from section 6.1. Prune to the VLANs whose hosts attach to this pair.
+
+vlan 10
+  name MGMT
+  vn-segment 120010
+vlan 20
+  name SERVERS-20
+  vn-segment 120020
+vlan 30
+  name APP-30
+  vn-segment 120030
+vlan 40
+  name DB-40
+  vn-segment 120040
+vlan 100
+  name STORAGE-100
+  vn-segment 120100
+
+interface Vlan10
+  description MGMT (anycast gateway)
+  shutdown                        ! no shutdown at this VLAN&#x27;s gateway cut-over (migration M4)
+  mtu 9216
+  vrf member TRUST
+  no ip redirects
+  ip address 10.120.10.1/24
+  fabric forwarding mode anycast-gateway
+
+interface Vlan20
+  description SERVERS-20 (anycast gateway)
+  shutdown                        ! no shutdown at this VLAN&#x27;s gateway cut-over (migration M4)
+  mtu 9216
+  vrf member TRUST
+  no ip redirects
+  ip address 10.120.20.1/24
+  fabric forwarding mode anycast-gateway
+
+interface Vlan30
+  description APP-30 (anycast gateway)
+  shutdown                        ! no shutdown at this VLAN&#x27;s gateway cut-over (migration M4)
+  mtu 9216
+  vrf member TRUST
+  no ip redirects
+  ip address 10.120.30.1/24
+  fabric forwarding mode anycast-gateway
+
+interface Vlan40
+  description DB-40 (anycast gateway)
+  shutdown                        ! no shutdown at this VLAN&#x27;s gateway cut-over (migration M4)
+  mtu 9216
+  vrf member TRUST
+  no ip redirects
+  ip address 10.120.40.1/24
+  fabric forwarding mode anycast-gateway
+
+interface Vlan100
+  description STORAGE-100 (anycast gateway)
+  shutdown                        ! no shutdown at this VLAN&#x27;s gateway cut-over (migration M4)
+  mtu 9216
+  vrf member TRUST
+  no ip redirects
+  ip address 10.120.100.1/24
+  fabric forwarding mode anycast-gateway
+
+! Explicit RTs: with a different ASN per leaf, &#x27;auto&#x27; would give every leaf a different RT.
+evpn
+  vni 120010 l2
+    rd auto
+    route-target import 65120:120010
+    route-target export 65120:120010
+  vni 120020 l2
+    rd auto
+    route-target import 65120:120020
+    route-target export 65120:120020
+  vni 120030 l2
+    rd auto
+    route-target import 65120:120030
+    route-target export 65120:120030
+  vni 120040 l2
+    rd auto
+    route-target import 65120:120040
+    route-target export 65120:120040
+  vni 120100 l2
+    rd auto
+    route-target import 65120:120100
+    route-target export 65120:120100
+
+! ARP suppression needs TCAM space on -EX/-FX platforms first (then reload):
+!   hardware access-list tcam region arp-ether 256 double-wide
+interface nve1
+  no shutdown
+  host-reachability protocol bgp
+  source-interface loopback1
+  advertise virtual-rmac
+  global ingress-replication protocol bgp
+  global suppress-arp
+  member vni 50010 associate-vrf
+  member vni 120010
+  member vni 120020
+  member vni 120030
+  member vni 120040
+  member vni 120100
+
+! ---- BGP: underlay + overlay ------------------------------------------
+ip prefix-list PL-DC2-SITE seq 10 permit 10.120.0.0/16 le 32
+route-map RM-DIRECT permit 10
+  match ip address prefix-list PL-DC2-SITE
+
+router bgp 65223
+  router-id 10.120.240.13
+  bestpath as-path multipath-relax
+  address-family ipv4 unicast
+    network 10.120.240.13/32
+    network 10.120.241.13/32
+    network 10.120.241.102/32
+    maximum-paths 4
+  address-family l2vpn evpn
+    advertise-pip
+  neighbor 10.120.242.4
+    remote-as 65220
+    description DC2-NXSP-01 underlay
+    bfd
+    address-family ipv4 unicast
+  neighbor 10.120.242.36
+    remote-as 65220
+    description DC2-NXSP-02 underlay
+    bfd
+    address-family ipv4 unicast
+  neighbor 10.120.243.14
+    remote-as 65224
+    description DC2-NXLF-04 vPC backup underlay
+    bfd
+    address-family ipv4 unicast
+  neighbor 10.120.240.1
+    remote-as 65220
+    description DC2-NXSP-01 EVPN
+    update-source loopback0
+    ebgp-multihop 2
+    address-family l2vpn evpn
+      send-community
+      send-community extended
+  neighbor 10.120.240.2
+    remote-as 65220
+    description DC2-NXSP-02 EVPN
+    update-source loopback0
+    ebgp-multihop 2
+    address-family l2vpn evpn
+      send-community
+      send-community extended
+  vrf TRUST
+    address-family ipv4 unicast
+      redistribute direct route-map RM-DIRECT
+      maximum-paths 4
+
+! ---- border-service: firewall handoff (eBGP, VRF TRUST) ---------
+! Routed transit, no ae8 and no vPC to the firewall. FW-01 and FW-02 share the HA-synced
+! address, so both firewalls&#x27; ports sit in one local VLAN; only the active one forwards.
+vlan 3011
+  name FW-TRANSIT-LF-03
+
+interface Vlan3011
+  description Firewall transit 10.120.244.64/29 (DC2-FW-01/02 ethernet1/24)
+  no shutdown
+  vrf member TRUST
+  no ip redirects
+  ip address 10.120.244.66/29          ! firewall 10.120.244.65
+
+interface Ethernet1/45
+  description DC2-FW-01 ethernet1/24
+  switchport mode access
+  switchport access vlan 3011
+  spanning-tree port type edge
+  no shutdown
+interface Ethernet1/46
+  description DC2-FW-02 ethernet1/24
+  switchport mode access
+  switchport access vlan 3011
+  spanning-tree port type edge
+  no shutdown
+
+interface port-channel10
+  switchport trunk allowed vlan remove 3011   ! local VLAN: keep it off the vPC peer-link
+
+ip prefix-list PL-DEFAULT seq 10 permit 0.0.0.0/0
+ip prefix-list PL-DC1-SITE seq 10 permit 10.110.0.0/16 le 32
+
+route-map RM-FW-IN permit 10          ! the firewall sends only the default route
+  match ip address prefix-list PL-DEFAULT
+route-map RM-FW-OUT permit 10         ! both sites&#x27; specifics (beat the firewall&#x27;s IPsec statics)
+  match ip address prefix-list PL-DC2-SITE PL-DC1-SITE
+
+! ---- migration only (M2-M5): eBGP to the legacy core over VLAN 99 -------
+! The legacy core must run BGP (AS 65228) for the migration window and
+! redistribute its connected/OSPF routes into it. Remove this block at M7.
+vlan 99
+  name LEGACY-CORE-10.120.99.0
+
+interface Vlan99
+  description Legacy core transit (migration)
+  no shutdown
+  vrf member TRUST
+  no ip redirects
+  ip address 10.120.99.11/24              ! confirm free in 10.120.99.0/24
+
+interface port-channel30
+  description Legacy core DC2-CORE-01/02 (migration)
+  switchport mode trunk
+  switchport trunk allowed vlan 99
+  spanning-tree port type normal
+  vpc 30
+  shutdown
+interface Ethernet1/43
+  description Legacy core switch 01 (migration)
+  switchport mode trunk
+  switchport trunk allowed vlan 99
+  channel-group 30 mode active
+  shutdown
+interface Ethernet1/44
+  description Legacy core switch 02 (migration)
+  switchport mode trunk
+  switchport trunk allowed vlan 99
+  channel-group 30 mode active
+  shutdown
+
+ip as-path access-list AL-DC2-FABRIC seq 10 permit &quot;_(65220|65221|65222|65223|65224|65225|65226)_&quot;
+route-map RM-LEGACY-IN deny 5         ! never take our own routes back from the core
+  match as-path AL-DC2-FABRIC
+route-map RM-LEGACY-IN permit 10      ! legacy subnets not yet migrated
+  match ip address prefix-list PL-DC2-SITE
+route-map RM-LEGACY-IN permit 20      ! legacy default until the firewall moves (M5)
+  match ip address prefix-list PL-DEFAULT
+  set local-preference 50
+route-map RM-LEGACY-OUT permit 10
+  match ip address prefix-list PL-DC2-SITE PL-DC1-SITE PL-DEFAULT
+
+router bgp 65223
+  vrf TRUST
+    neighbor 10.120.244.65
+      remote-as 65227
+      description DC2-FW (active member) ethernet1/24
+      bfd
+      address-family ipv4 unicast
+        route-map RM-FW-IN in
+        route-map RM-FW-OUT out
+        maximum-prefix 10
+    neighbor 10.120.99.2
+      remote-as 65228
+      description Legacy core (migration only)
+      shutdown
+      address-family ipv4 unicast
+        route-map RM-LEGACY-IN in
+        route-map RM-LEGACY-OUT out</code></pre></details><details><summary>DC2-NXLF-04 (Border-service leaf / VTEP) · <a href="configs/DC2-NXLF-04.cfg">DC2-NXLF-04.cfg</a></summary><pre><code>!==============================================================================
+! DC2-NXLF-04 · Border-service leaf / VTEP · BGP AS 65224
+! DC1-DC2 EVPN/VXLAN Multi-Site demo fabric (BGP only). Generated by fabric_design.
+! FICTIONAL DEMO DATA: not for any real network.
+! Template: validate against the exact Nexus model and NX-OS release before use.
+! Fill in every &lt;placeholder&gt;. Host-gateway SVIs ship shut (migration step M4).
+! Not included: AAA/TACACS, NTP, SNMP, syslog, banners, users. Apply your own baseline.
+!==============================================================================
+
+hostname DC2-NXLF-04
+
+! ---- out-of-band management (10.120.245.0/24, gateway on the firewall) ---
+vrf context management
+  ip route 0.0.0.0/0 10.120.245.1
+interface mgmt0
+  vrf member management
+  ip address 10.120.245.24/24
+
+nv overlay evpn
+feature bgp
+feature bfd
+feature interface-vlan
+feature vn-segment-vlan-based
+feature nv overlay
+feature vpc
+feature lacp
+fabric forwarding anycast-gateway-mac 2020.0000.00aa
+
+! ---- underlay (eBGP, AS 65224) ---------------------------------------
+interface loopback0
+  description Router-ID / EVPN peering
+  ip address 10.120.240.14/32
+
+interface loopback1
+  description VTEP (primary) + vPC anycast VTEP (secondary)
+  ip address 10.120.241.14/32
+  ip address 10.120.241.102/32 secondary
+
+interface Ethernet1/49
+  description DC2-NXSP-01 Eth1/4
+  no switchport
+  mtu 9216
+  no ip redirects
+  ip address 10.120.242.7/31
+  no shutdown
+
+interface Ethernet1/50
+  description DC2-NXSP-02 Eth1/4
+  no switchport
+  mtu 9216
+  no ip redirects
+  ip address 10.120.242.39/31
+  no shutdown
+
+! ---- vPC ---------------------------------------------------------------
+vrf context KEEPALIVE
+
+interface Ethernet1/48
+  description vPC keepalive to DC2-NXLF-03
+  no switchport
+  vrf member KEEPALIVE
+  ip address 10.120.243.10/30
+  no shutdown
+
+spanning-tree vlan 1-3967 priority 8192
+
+vpc domain 122
+  peer-switch
+  role priority 20
+  peer-keepalive destination 10.120.243.9 source 10.120.243.10 vrf KEEPALIVE
+  peer-gateway
+  ip arp synchronize
+
+interface port-channel10
+  description vPC peer-link to DC2-NXLF-03
+  switchport mode trunk
+  spanning-tree port type network
+  vpc peer-link
+
+interface Ethernet1/53-54
+  description vPC peer-link
+  switchport mode trunk
+  channel-group 10 mode active
+  no shutdown
+
+vlan 3900
+  name VPC-BACKUP-UNDERLAY
+system nve infra-vlans 3900
+
+interface Vlan3900
+  description vPC backup underlay to DC2-NXLF-03 (eBGP)
+  no shutdown
+  mtu 9216
+  no ip redirects
+  ip address 10.120.243.14/30
+
+! ---- tenant VRF and L3VNI ---------------------------------------------
+vrf context TRUST
+  vni 50010
+  rd auto
+  address-family ipv4 unicast
+    route-target both 65000:50010
+    route-target both 65000:50010 evpn
+
+vlan 3910
+  name L3VNI-TRUST
+  vn-segment 50010
+
+interface Vlan3910
+  description L3VNI TRUST
+  no shutdown
+  mtu 9216
+  vrf member TRUST
+  no ip redirects
+  ip forward
+
+! ---- host VLANs: same VLAN ID, subnet and .1 gateway as today ----------
+! Every routed VLAN from section 6.1. Prune to the VLANs whose hosts attach to this pair.
+
+vlan 10
+  name MGMT
+  vn-segment 120010
+vlan 20
+  name SERVERS-20
+  vn-segment 120020
+vlan 30
+  name APP-30
+  vn-segment 120030
+vlan 40
+  name DB-40
+  vn-segment 120040
+vlan 100
+  name STORAGE-100
+  vn-segment 120100
+
+interface Vlan10
+  description MGMT (anycast gateway)
+  shutdown                        ! no shutdown at this VLAN&#x27;s gateway cut-over (migration M4)
+  mtu 9216
+  vrf member TRUST
+  no ip redirects
+  ip address 10.120.10.1/24
+  fabric forwarding mode anycast-gateway
+
+interface Vlan20
+  description SERVERS-20 (anycast gateway)
+  shutdown                        ! no shutdown at this VLAN&#x27;s gateway cut-over (migration M4)
+  mtu 9216
+  vrf member TRUST
+  no ip redirects
+  ip address 10.120.20.1/24
+  fabric forwarding mode anycast-gateway
+
+interface Vlan30
+  description APP-30 (anycast gateway)
+  shutdown                        ! no shutdown at this VLAN&#x27;s gateway cut-over (migration M4)
+  mtu 9216
+  vrf member TRUST
+  no ip redirects
+  ip address 10.120.30.1/24
+  fabric forwarding mode anycast-gateway
+
+interface Vlan40
+  description DB-40 (anycast gateway)
+  shutdown                        ! no shutdown at this VLAN&#x27;s gateway cut-over (migration M4)
+  mtu 9216
+  vrf member TRUST
+  no ip redirects
+  ip address 10.120.40.1/24
+  fabric forwarding mode anycast-gateway
+
+interface Vlan100
+  description STORAGE-100 (anycast gateway)
+  shutdown                        ! no shutdown at this VLAN&#x27;s gateway cut-over (migration M4)
+  mtu 9216
+  vrf member TRUST
+  no ip redirects
+  ip address 10.120.100.1/24
+  fabric forwarding mode anycast-gateway
+
+! Explicit RTs: with a different ASN per leaf, &#x27;auto&#x27; would give every leaf a different RT.
+evpn
+  vni 120010 l2
+    rd auto
+    route-target import 65120:120010
+    route-target export 65120:120010
+  vni 120020 l2
+    rd auto
+    route-target import 65120:120020
+    route-target export 65120:120020
+  vni 120030 l2
+    rd auto
+    route-target import 65120:120030
+    route-target export 65120:120030
+  vni 120040 l2
+    rd auto
+    route-target import 65120:120040
+    route-target export 65120:120040
+  vni 120100 l2
+    rd auto
+    route-target import 65120:120100
+    route-target export 65120:120100
+
+! ARP suppression needs TCAM space on -EX/-FX platforms first (then reload):
+!   hardware access-list tcam region arp-ether 256 double-wide
+interface nve1
+  no shutdown
+  host-reachability protocol bgp
+  source-interface loopback1
+  advertise virtual-rmac
+  global ingress-replication protocol bgp
+  global suppress-arp
+  member vni 50010 associate-vrf
+  member vni 120010
+  member vni 120020
+  member vni 120030
+  member vni 120040
+  member vni 120100
+
+! ---- BGP: underlay + overlay ------------------------------------------
+ip prefix-list PL-DC2-SITE seq 10 permit 10.120.0.0/16 le 32
+route-map RM-DIRECT permit 10
+  match ip address prefix-list PL-DC2-SITE
+
+router bgp 65224
+  router-id 10.120.240.14
+  bestpath as-path multipath-relax
+  address-family ipv4 unicast
+    network 10.120.240.14/32
+    network 10.120.241.14/32
+    network 10.120.241.102/32
+    maximum-paths 4
+  address-family l2vpn evpn
+    advertise-pip
+  neighbor 10.120.242.6
+    remote-as 65220
+    description DC2-NXSP-01 underlay
+    bfd
+    address-family ipv4 unicast
+  neighbor 10.120.242.38
+    remote-as 65220
+    description DC2-NXSP-02 underlay
+    bfd
+    address-family ipv4 unicast
+  neighbor 10.120.243.13
+    remote-as 65223
+    description DC2-NXLF-03 vPC backup underlay
+    bfd
+    address-family ipv4 unicast
+  neighbor 10.120.240.1
+    remote-as 65220
+    description DC2-NXSP-01 EVPN
+    update-source loopback0
+    ebgp-multihop 2
+    address-family l2vpn evpn
+      send-community
+      send-community extended
+  neighbor 10.120.240.2
+    remote-as 65220
+    description DC2-NXSP-02 EVPN
+    update-source loopback0
+    ebgp-multihop 2
+    address-family l2vpn evpn
+      send-community
+      send-community extended
+  vrf TRUST
+    address-family ipv4 unicast
+      redistribute direct route-map RM-DIRECT
+      maximum-paths 4
+
+! ---- border-service: firewall handoff (eBGP, VRF TRUST) ---------
+! Routed transit, no ae8 and no vPC to the firewall. FW-01 and FW-02 share the HA-synced
+! address, so both firewalls&#x27; ports sit in one local VLAN; only the active one forwards.
+vlan 3012
+  name FW-TRANSIT-LF-04
+
+interface Vlan3012
+  description Firewall transit 10.120.244.72/29 (DC2-FW-01/02 ethernet1/26)
+  no shutdown
+  vrf member TRUST
+  no ip redirects
+  ip address 10.120.244.74/29          ! firewall 10.120.244.73
+
+interface Ethernet1/45
+  description DC2-FW-01 ethernet1/26
+  switchport mode access
+  switchport access vlan 3012
+  spanning-tree port type edge
+  no shutdown
+interface Ethernet1/46
+  description DC2-FW-02 ethernet1/26
+  switchport mode access
+  switchport access vlan 3012
+  spanning-tree port type edge
+  no shutdown
+
+interface port-channel10
+  switchport trunk allowed vlan remove 3012   ! local VLAN: keep it off the vPC peer-link
+
+ip prefix-list PL-DEFAULT seq 10 permit 0.0.0.0/0
+ip prefix-list PL-DC1-SITE seq 10 permit 10.110.0.0/16 le 32
+
+route-map RM-FW-IN permit 10          ! the firewall sends only the default route
+  match ip address prefix-list PL-DEFAULT
+route-map RM-FW-OUT permit 10         ! both sites&#x27; specifics (beat the firewall&#x27;s IPsec statics)
+  match ip address prefix-list PL-DC2-SITE PL-DC1-SITE
+
+! ---- migration only (M2-M5): eBGP to the legacy core over VLAN 99 -------
+! The legacy core must run BGP (AS 65228) for the migration window and
+! redistribute its connected/OSPF routes into it. Remove this block at M7.
+vlan 99
+  name LEGACY-CORE-10.120.99.0
+
+interface Vlan99
+  description Legacy core transit (migration)
+  no shutdown
+  vrf member TRUST
+  no ip redirects
+  ip address 10.120.99.12/24              ! confirm free in 10.120.99.0/24
+
+interface port-channel30
+  description Legacy core DC2-CORE-01/02 (migration)
+  switchport mode trunk
+  switchport trunk allowed vlan 99
+  spanning-tree port type normal
+  vpc 30
+  shutdown
+interface Ethernet1/43
+  description Legacy core switch 01 (migration)
+  switchport mode trunk
+  switchport trunk allowed vlan 99
+  channel-group 30 mode active
+  shutdown
+interface Ethernet1/44
+  description Legacy core switch 02 (migration)
+  switchport mode trunk
+  switchport trunk allowed vlan 99
+  channel-group 30 mode active
+  shutdown
+
+ip as-path access-list AL-DC2-FABRIC seq 10 permit &quot;_(65220|65221|65222|65223|65224|65225|65226)_&quot;
+route-map RM-LEGACY-IN deny 5         ! never take our own routes back from the core
+  match as-path AL-DC2-FABRIC
+route-map RM-LEGACY-IN permit 10      ! legacy subnets not yet migrated
+  match ip address prefix-list PL-DC2-SITE
+route-map RM-LEGACY-IN permit 20      ! legacy default until the firewall moves (M5)
+  match ip address prefix-list PL-DEFAULT
+  set local-preference 50
+route-map RM-LEGACY-OUT permit 10
+  match ip address prefix-list PL-DC2-SITE PL-DC1-SITE PL-DEFAULT
+
+router bgp 65224
+  vrf TRUST
+    neighbor 10.120.244.73
+      remote-as 65227
+      description DC2-FW (active member) ethernet1/26
+      bfd
+      address-family ipv4 unicast
+        route-map RM-FW-IN in
+        route-map RM-FW-OUT out
+        maximum-prefix 10
+    neighbor 10.120.99.2
+      remote-as 65228
+      description Legacy core (migration only)
+      shutdown
+      address-family ipv4 unicast
+        route-map RM-LEGACY-IN in
+        route-map RM-LEGACY-OUT out</code></pre></details><details><summary>DC2-NXBGW-01 (Multi-Site BGW) · <a href="configs/DC2-NXBGW-01.cfg">DC2-NXBGW-01.cfg</a></summary><pre><code>!==============================================================================
+! DC2-NXBGW-01 · Multi-Site BGW · BGP AS 65225
+! DC1-DC2 EVPN/VXLAN Multi-Site demo fabric (BGP only). Generated by fabric_design.
+! FICTIONAL DEMO DATA: not for any real network.
+! Template: validate against the exact Nexus model and NX-OS release before use.
+! Fill in every &lt;placeholder&gt;. Host-gateway SVIs ship shut (migration step M4).
+! Not included: AAA/TACACS, NTP, SNMP, syslog, banners, users. Apply your own baseline.
+!==============================================================================
+
+hostname DC2-NXBGW-01
+
+! ---- out-of-band management (10.120.245.0/24, gateway on the firewall) ---
+vrf context management
+  ip route 0.0.0.0/0 10.120.245.1
+interface mgmt0
+  vrf member management
+  ip address 10.120.245.31/24
+
+nv overlay evpn
+feature bgp
+feature bfd
+feature interface-vlan
+feature vn-segment-vlan-based
+feature nv overlay
+
+evpn multisite border-gateway 120
+  delay-restore time 300
+
+interface loopback0
+  ip address 10.120.240.21/32
+interface loopback1
+  description VTEP
+  ip address 10.120.241.21/32
+interface loopback100
+  description Multi-Site VIP (shared by both DC2 BGWs)
+  ip address 10.120.241.200/32
+
+interface Ethernet1/49
+  description DC2-NXSP-01 Eth1/5
+  no switchport
+  mtu 9216
+  no ip redirects
+  ip address 10.120.242.9/31
+  evpn multisite fabric-tracking
+  no shutdown
+interface Ethernet1/50
+  description DC2-NXSP-02 Eth1/5
+  no switchport
+  mtu 9216
+  no ip redirects
+  ip address 10.120.242.41/31
+  evpn multisite fabric-tracking
+  no shutdown
+
+interface Ethernet1/51
+  description DCI carrier A to DC1-NXBGW-01
+  no switchport
+  mtu 9216                         ! set to the carrier&#x27;s maximum if lower
+  no ip redirects
+  ip address 10.110.246.1/31
+  evpn multisite dci-tracking
+  no shutdown
+
+! ---- day-one cloud handoff (VRF TRUST) --------------------------------
+interface Ethernet1/52
+  description Cloud handoff: AWS DX connection 1 + Azure ER primary
+  no switchport
+  mtu 9216
+  no shutdown
+
+interface Ethernet1/52.&lt;AWS-VIF-VLAN&gt;
+  description AWS Direct Connect private VIF (connection 1)
+  encapsulation dot1q &lt;AWS-VIF-VLAN&gt;    ! VLAN set on the VIF / by the hosted provider
+  mtu 1500                              ! 9001 if the VIF is created with jumbo frames
+  vrf member TRUST
+  no ip redirects
+  ip address 10.120.244.1/30
+  no shutdown
+
+interface Ethernet1/52.&lt;ER-VLAN&gt;
+  description Azure ExpressRoute private peering (primary link)
+  encapsulation dot1q &lt;ER-VLAN&gt;         ! VLAN ID configured on the ER private peering
+  mtu 1500                              ! ExpressRoute MTU is 1500
+  vrf member TRUST
+  no ip redirects
+  ip address 10.120.244.17/30
+  no shutdown
+
+vrf context TRUST
+  vni 50010
+  rd auto
+  address-family ipv4 unicast
+    route-target both 65000:50010
+    route-target both 65000:50010 evpn
+vlan 3910
+  vn-segment 50010
+interface Vlan3910
+  no shutdown
+  mtu 9216
+  vrf member TRUST
+  ip forward
+
+interface nve1
+  no shutdown
+  host-reachability protocol bgp
+  source-interface loopback1
+  multisite border-gateway interface loopback100
+  member vni 50010 associate-vrf
+
+! ---- underlay filters: only BGW loopbacks cross the DCI ----------------
+ip prefix-list PL-BGW-LOCAL seq 10 permit 10.120.240.21/32
+ip prefix-list PL-BGW-LOCAL seq 20 permit 10.120.240.22/32
+ip prefix-list PL-BGW-LOCAL seq 30 permit 10.120.241.21/32
+ip prefix-list PL-BGW-LOCAL seq 40 permit 10.120.241.22/32
+ip prefix-list PL-BGW-LOCAL seq 50 permit 10.120.241.200/32
+ip prefix-list PL-BGW-REMOTE seq 10 permit 10.110.240.21/32
+ip prefix-list PL-BGW-REMOTE seq 20 permit 10.110.240.22/32
+ip prefix-list PL-BGW-REMOTE seq 30 permit 10.110.241.21/32
+ip prefix-list PL-BGW-REMOTE seq 40 permit 10.110.241.22/32
+ip prefix-list PL-BGW-REMOTE seq 50 permit 10.110.241.200/32
+route-map RM-FABRIC-UL-OUT permit 10    ! into the local fabric: own BGW loopbacks only
+  match ip address prefix-list PL-BGW-LOCAL
+route-map RM-DCI-UL-OUT permit 10
+  match ip address prefix-list PL-BGW-LOCAL
+route-map RM-DCI-UL-IN permit 10
+  match ip address prefix-list PL-BGW-REMOTE
+
+! ---- overlay filters: what may cross the DCI ---------------------------
+ip prefix-list PL-DC2-SITE seq 10 permit 10.120.0.0/16 le 32
+ip prefix-list PL-DC1-SITE seq 10 permit 10.110.0.0/16 le 32
+ip prefix-list PL-CLOUD-AWS seq 10 permit 10.200.0.0/16 le 24
+ip prefix-list PL-CLOUD-AZURE seq 10 permit 10.210.0.0/16 le 24
+ip prefix-list PL-TO-CLOUD seq 10 permit 10.120.0.0/16
+ip prefix-list PL-TO-CLOUD-BACKUP seq 10 permit 10.110.0.0/16
+
+route-map RM-DCI-EVPN-OUT permit 10     ! own site prefixes; never 0.0.0.0/0
+  match ip address prefix-list PL-DC2-SITE
+route-map RM-DCI-EVPN-OUT permit 20     ! cloud prefixes learned at this site (type-5)
+  match ip address prefix-list PL-CLOUD-AWS PL-CLOUD-AZURE
+route-map RM-DCI-EVPN-IN permit 10
+  match ip address prefix-list PL-DC1-SITE
+route-map RM-DCI-EVPN-IN permit 20
+  match ip address prefix-list PL-CLOUD-AWS PL-CLOUD-AZURE
+
+! ---- what may be exchanged with AWS / Azure ----------------------------
+route-map RM-AWS-IN permit 10           ! approved VPC CIDRs only; no default, no on-prem prefixes
+  match ip address prefix-list PL-CLOUD-AWS
+route-map RM-AZURE-IN permit 10         ! approved VNet CIDRs only
+  match ip address prefix-list PL-CLOUD-AZURE
+route-map RM-TO-CLOUD permit 10         ! this site&#x27;s /16, preferred
+  match ip address prefix-list PL-TO-CLOUD
+route-map RM-TO-CLOUD permit 20         ! the other site&#x27;s /16 as backup over the DCI
+  match ip address prefix-list PL-TO-CLOUD-BACKUP
+  set as-path prepend 65225 65225 65225
+
+router bgp 65225
+  router-id 10.120.240.21
+  bestpath as-path multipath-relax
+  address-family ipv4 unicast
+    network 10.120.240.21/32
+    network 10.120.241.21/32
+    network 10.120.241.200/32
+    maximum-paths 4
+  address-family l2vpn evpn
+  ! local fabric: eBGP underlay on the links, eBGP EVPN to the spine loopbacks
+  neighbor 10.120.242.8
+    remote-as 65220
+    description DC2-NXSP-01 underlay
+    bfd
+    address-family ipv4 unicast
+      route-map RM-FABRIC-UL-OUT out
+  neighbor 10.120.242.40
+    remote-as 65220
+    description DC2-NXSP-02 underlay
+    bfd
+    address-family ipv4 unicast
+      route-map RM-FABRIC-UL-OUT out
+  neighbor 10.120.240.1
+    remote-as 65220
+    description DC2-NXSP-01 EVPN
+    update-source loopback0
+    ebgp-multihop 2
+    address-family l2vpn evpn
+      send-community
+      send-community extended
+  neighbor 10.120.240.2
+    remote-as 65220
+    description DC2-NXSP-02 EVPN
+    update-source loopback0
+    ebgp-multihop 2
+    address-family l2vpn evpn
+      send-community
+      send-community extended
+  ! DCI underlay (carrier A)
+  neighbor 10.110.246.0
+    remote-as 65215
+    description DC1-NXBGW-01 underlay
+    bfd
+    address-family ipv4 unicast
+      route-map RM-DCI-UL-IN in
+      route-map RM-DCI-UL-OUT out
+  ! DCI overlay to both remote BGWs
+  neighbor 10.110.240.21
+    remote-as 65215
+    description DC1-NXBGW-01 EVPN
+    update-source loopback0
+    ebgp-multihop 5
+    peer-type fabric-external
+    address-family l2vpn evpn
+      send-community
+      send-community extended
+      route-map RM-DCI-EVPN-IN in
+      route-map RM-DCI-EVPN-OUT out
+  neighbor 10.110.240.22
+    remote-as 65216
+    description DC1-NXBGW-02 EVPN
+    update-source loopback0
+    ebgp-multihop 5
+    peer-type fabric-external
+    address-family l2vpn evpn
+      send-community
+      send-community extended
+      route-map RM-DCI-EVPN-IN in
+      route-map RM-DCI-EVPN-OUT out
+  ! cloud peerings: learned prefixes become type-5 routes in the local fabric and, through
+  ! RM-DCI-EVPN-OUT, at the other site (which prefers its own cloud links: shorter AS path)
+  vrf TRUST
+    address-family ipv4 unicast
+      aggregate-address 10.120.0.0/16
+      aggregate-address 10.110.0.0/16
+      maximum-paths 4
+    neighbor 10.120.244.2
+      remote-as 64512
+      description AWS Direct Connect private VIF (connection 1)
+      password &lt;BGP MD5 key from Secret Server&gt;
+      bfd
+      address-family ipv4 unicast
+        route-map RM-AWS-IN in
+        route-map RM-TO-CLOUD out
+        maximum-prefix 100 warning-only
+    neighbor 10.120.244.18
+      remote-as 12076
+      description Azure ExpressRoute private peering (primary link)
+      bfd
+      address-family ipv4 unicast
+        route-map RM-AZURE-IN in
+        route-map RM-TO-CLOUD out
+        maximum-prefix 100 warning-only</code></pre></details><details><summary>DC2-NXBGW-02 (Multi-Site BGW) · <a href="configs/DC2-NXBGW-02.cfg">DC2-NXBGW-02.cfg</a></summary><pre><code>!==============================================================================
+! DC2-NXBGW-02 · Multi-Site BGW · BGP AS 65226
+! DC1-DC2 EVPN/VXLAN Multi-Site demo fabric (BGP only). Generated by fabric_design.
+! FICTIONAL DEMO DATA: not for any real network.
+! Template: validate against the exact Nexus model and NX-OS release before use.
+! Fill in every &lt;placeholder&gt;. Host-gateway SVIs ship shut (migration step M4).
+! Not included: AAA/TACACS, NTP, SNMP, syslog, banners, users. Apply your own baseline.
+!==============================================================================
+
+hostname DC2-NXBGW-02
+
+! ---- out-of-band management (10.120.245.0/24, gateway on the firewall) ---
+vrf context management
+  ip route 0.0.0.0/0 10.120.245.1
+interface mgmt0
+  vrf member management
+  ip address 10.120.245.32/24
+
+nv overlay evpn
+feature bgp
+feature bfd
+feature interface-vlan
+feature vn-segment-vlan-based
+feature nv overlay
+
+evpn multisite border-gateway 120
+  delay-restore time 300
+
+interface loopback0
+  ip address 10.120.240.22/32
+interface loopback1
+  description VTEP
+  ip address 10.120.241.22/32
+interface loopback100
+  description Multi-Site VIP (shared by both DC2 BGWs)
+  ip address 10.120.241.200/32
+
+interface Ethernet1/49
+  description DC2-NXSP-01 Eth1/6
+  no switchport
+  mtu 9216
+  no ip redirects
+  ip address 10.120.242.11/31
+  evpn multisite fabric-tracking
+  no shutdown
+interface Ethernet1/50
+  description DC2-NXSP-02 Eth1/6
+  no switchport
+  mtu 9216
+  no ip redirects
+  ip address 10.120.242.43/31
+  evpn multisite fabric-tracking
+  no shutdown
+
+interface Ethernet1/51
+  description DCI carrier B to DC1-NXBGW-02
+  no switchport
+  mtu 9216                         ! set to the carrier&#x27;s maximum if lower
+  no ip redirects
+  ip address 10.120.246.0/31
+  evpn multisite dci-tracking
+  no shutdown
+
+! ---- day-one cloud handoff (VRF TRUST) --------------------------------
+interface Ethernet1/52
+  description Cloud handoff: AWS DX connection 2 + Azure ER secondary
+  no switchport
+  mtu 9216
+  no shutdown
+
+interface Ethernet1/52.&lt;AWS-VIF-VLAN&gt;
+  description AWS Direct Connect private VIF (connection 2)
+  encapsulation dot1q &lt;AWS-VIF-VLAN&gt;    ! VLAN set on the VIF / by the hosted provider
+  mtu 1500                              ! 9001 if the VIF is created with jumbo frames
+  vrf member TRUST
+  no ip redirects
+  ip address 10.120.244.9/30
+  no shutdown
+
+interface Ethernet1/52.&lt;ER-VLAN&gt;
+  description Azure ExpressRoute private peering (secondary link)
+  encapsulation dot1q &lt;ER-VLAN&gt;         ! VLAN ID configured on the ER private peering
+  mtu 1500                              ! ExpressRoute MTU is 1500
+  vrf member TRUST
+  no ip redirects
+  ip address 10.120.244.21/30
+  no shutdown
+
+vrf context TRUST
+  vni 50010
+  rd auto
+  address-family ipv4 unicast
+    route-target both 65000:50010
+    route-target both 65000:50010 evpn
+vlan 3910
+  vn-segment 50010
+interface Vlan3910
+  no shutdown
+  mtu 9216
+  vrf member TRUST
+  ip forward
+
+interface nve1
+  no shutdown
+  host-reachability protocol bgp
+  source-interface loopback1
+  multisite border-gateway interface loopback100
+  member vni 50010 associate-vrf
+
+! ---- underlay filters: only BGW loopbacks cross the DCI ----------------
+ip prefix-list PL-BGW-LOCAL seq 10 permit 10.120.240.21/32
+ip prefix-list PL-BGW-LOCAL seq 20 permit 10.120.240.22/32
+ip prefix-list PL-BGW-LOCAL seq 30 permit 10.120.241.21/32
+ip prefix-list PL-BGW-LOCAL seq 40 permit 10.120.241.22/32
+ip prefix-list PL-BGW-LOCAL seq 50 permit 10.120.241.200/32
+ip prefix-list PL-BGW-REMOTE seq 10 permit 10.110.240.21/32
+ip prefix-list PL-BGW-REMOTE seq 20 permit 10.110.240.22/32
+ip prefix-list PL-BGW-REMOTE seq 30 permit 10.110.241.21/32
+ip prefix-list PL-BGW-REMOTE seq 40 permit 10.110.241.22/32
+ip prefix-list PL-BGW-REMOTE seq 50 permit 10.110.241.200/32
+route-map RM-FABRIC-UL-OUT permit 10    ! into the local fabric: own BGW loopbacks only
+  match ip address prefix-list PL-BGW-LOCAL
+route-map RM-DCI-UL-OUT permit 10
+  match ip address prefix-list PL-BGW-LOCAL
+route-map RM-DCI-UL-IN permit 10
+  match ip address prefix-list PL-BGW-REMOTE
+
+! ---- overlay filters: what may cross the DCI ---------------------------
+ip prefix-list PL-DC2-SITE seq 10 permit 10.120.0.0/16 le 32
+ip prefix-list PL-DC1-SITE seq 10 permit 10.110.0.0/16 le 32
+ip prefix-list PL-CLOUD-AWS seq 10 permit 10.200.0.0/16 le 24
+ip prefix-list PL-CLOUD-AZURE seq 10 permit 10.210.0.0/16 le 24
+ip prefix-list PL-TO-CLOUD seq 10 permit 10.120.0.0/16
+ip prefix-list PL-TO-CLOUD-BACKUP seq 10 permit 10.110.0.0/16
+
+route-map RM-DCI-EVPN-OUT permit 10     ! own site prefixes; never 0.0.0.0/0
+  match ip address prefix-list PL-DC2-SITE
+route-map RM-DCI-EVPN-OUT permit 20     ! cloud prefixes learned at this site (type-5)
+  match ip address prefix-list PL-CLOUD-AWS PL-CLOUD-AZURE
+route-map RM-DCI-EVPN-IN permit 10
+  match ip address prefix-list PL-DC1-SITE
+route-map RM-DCI-EVPN-IN permit 20
+  match ip address prefix-list PL-CLOUD-AWS PL-CLOUD-AZURE
+
+! ---- what may be exchanged with AWS / Azure ----------------------------
+route-map RM-AWS-IN permit 10           ! approved VPC CIDRs only; no default, no on-prem prefixes
+  match ip address prefix-list PL-CLOUD-AWS
+route-map RM-AZURE-IN permit 10         ! approved VNet CIDRs only
+  match ip address prefix-list PL-CLOUD-AZURE
+route-map RM-TO-CLOUD permit 10         ! this site&#x27;s /16, preferred
+  match ip address prefix-list PL-TO-CLOUD
+route-map RM-TO-CLOUD permit 20         ! the other site&#x27;s /16 as backup over the DCI
+  match ip address prefix-list PL-TO-CLOUD-BACKUP
+  set as-path prepend 65226 65226 65226
+
+router bgp 65226
+  router-id 10.120.240.22
+  bestpath as-path multipath-relax
+  address-family ipv4 unicast
+    network 10.120.240.22/32
+    network 10.120.241.22/32
+    network 10.120.241.200/32
+    maximum-paths 4
+  address-family l2vpn evpn
+  ! local fabric: eBGP underlay on the links, eBGP EVPN to the spine loopbacks
+  neighbor 10.120.242.10
+    remote-as 65220
+    description DC2-NXSP-01 underlay
+    bfd
+    address-family ipv4 unicast
+      route-map RM-FABRIC-UL-OUT out
+  neighbor 10.120.242.42
+    remote-as 65220
+    description DC2-NXSP-02 underlay
+    bfd
+    address-family ipv4 unicast
+      route-map RM-FABRIC-UL-OUT out
+  neighbor 10.120.240.1
+    remote-as 65220
+    description DC2-NXSP-01 EVPN
+    update-source loopback0
+    ebgp-multihop 2
+    address-family l2vpn evpn
+      send-community
+      send-community extended
+  neighbor 10.120.240.2
+    remote-as 65220
+    description DC2-NXSP-02 EVPN
+    update-source loopback0
+    ebgp-multihop 2
+    address-family l2vpn evpn
+      send-community
+      send-community extended
+  ! DCI underlay (carrier B)
+  neighbor 10.120.246.1
+    remote-as 65216
+    description DC1-NXBGW-02 underlay
+    bfd
+    address-family ipv4 unicast
+      route-map RM-DCI-UL-IN in
+      route-map RM-DCI-UL-OUT out
+  ! DCI overlay to both remote BGWs
+  neighbor 10.110.240.21
+    remote-as 65215
+    description DC1-NXBGW-01 EVPN
+    update-source loopback0
+    ebgp-multihop 5
+    peer-type fabric-external
+    address-family l2vpn evpn
+      send-community
+      send-community extended
+      route-map RM-DCI-EVPN-IN in
+      route-map RM-DCI-EVPN-OUT out
+  neighbor 10.110.240.22
+    remote-as 65216
+    description DC1-NXBGW-02 EVPN
+    update-source loopback0
+    ebgp-multihop 5
+    peer-type fabric-external
+    address-family l2vpn evpn
+      send-community
+      send-community extended
+      route-map RM-DCI-EVPN-IN in
+      route-map RM-DCI-EVPN-OUT out
+  ! cloud peerings: learned prefixes become type-5 routes in the local fabric and, through
+  ! RM-DCI-EVPN-OUT, at the other site (which prefers its own cloud links: shorter AS path)
+  vrf TRUST
+    address-family ipv4 unicast
+      aggregate-address 10.120.0.0/16
+      aggregate-address 10.110.0.0/16
+      maximum-paths 4
+    neighbor 10.120.244.10
+      remote-as 64512
+      description AWS Direct Connect private VIF (connection 2)
+      password &lt;BGP MD5 key from Secret Server&gt;
+      bfd
+      address-family ipv4 unicast
+        route-map RM-AWS-IN in
+        route-map RM-TO-CLOUD out
+        maximum-prefix 100 warning-only
+    neighbor 10.120.244.22
+      remote-as 12076
+      description Azure ExpressRoute private peering (secondary link)
+      bfd
+      address-family ipv4 unicast
+        route-map RM-AZURE-IN in
+        route-map RM-TO-CLOUD out
+        maximum-prefix 100 warning-only</code></pre></details>
+</section><section id="migration"><h2>10. Migration from the legacy core</h2><div class="tw"><table class=""><thead><tr><th>Step</th><th>What</th><th>Detail</th><th>Risk</th></tr></thead><tbody><tr><td>M1</td><td>Build each fabric</td><td>Underlay, EVPN, NVE, L3VNI. Host SVIs created shut.</td><td>No production impact</td></tr><tr><td>M2</td><td>Join legacy core</td><td>eBGP to the legacy core on VLAN 99 for the migration window.</td><td>Low</td></tr><tr><td>M3</td><td>Move hosts and gateways</td><td>Per VLAN: extend, move servers, then bring up the anycast SVI.</td><td>Per VLAN</td></tr><tr><td>M4</td><td>Move the firewalls</td><td>Apply the PAN-OS handoff file and re-cable to LF-03/LF-04.</td><td>Change window</td></tr><tr><td>M5</td><td>Multi-Site and cloud</td><td>Bring up the BGWs, DCI and cloud sessions.</td><td>Changes inter-site paths</td></tr></tbody></table></div></section><section id="tests"><h2>11. Failure test matrix</h2><div class="tw"><table class=""><thead><tr><th>Failure</th><th>Expected result</th><th>Evidence</th></tr></thead><tbody><tr><td>Leaf uplink</td><td>Traffic shifts to the other spine via ECMP</td><td><code>show ip route</code></td></tr><tr><td>BGW-01</td><td>DCI traffic moves to BGW-02 / carrier B</td><td><code>show nve multisite dci-links</code></td></tr><tr><td>Palo Alto failover</td><td>BGP re-forms to both leafs</td><td><code>show high-availability state</code></td></tr></tbody></table></div></section><section id="open"><h2>12. Open items before implementation</h2><div class="tw"><table class=""><thead><tr><th>Item</th><th>What is needed</th></tr></thead><tbody><tr><td>Hardware</td><td>Nexus models, port maps, NX-OS release.</td></tr><tr><td>Carriers</td><td>DCI and cloud circuits, VLAN IDs, MTU.</td></tr></tbody></table></div></section></main>
+<footer>Generated by fabric_design from examples/demo-fabric.json. All names and addresses are made up.</footer>
+</body></html>

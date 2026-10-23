@@ -1,0 +1,25 @@
+# ---------------------------------------------------------------------------
+# network-design: only code, docs and FICTIONAL examples belong in git.
+# Real site data and everything generated from it stays in private/.
+# ---------------------------------------------------------------------------
+private/
+*.real.json
+exports/
+backups/
+out/
+
+# --- Secrets ---------------------------------------------------------------
+.env
+.env.*
+*.key
+*.pem
+secrets.*
+
+# --- Python / editors / OS --------------------------------------------------
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+.DS_Store
+.idea/
+.vscode/

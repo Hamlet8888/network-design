@@ -1,0 +1,50 @@
+# =============================================================================
+# DC1-FW-01 / DC1-FW-02 · firewall handoff to the fabric (PAN-OS, configure mode)
+# DEMO DATA. Apply on the active member in the M5 change window; HA syncs the peer.
+# Replaces ae8 (10.110.99.100/24) + OSPF with two routed interfaces + eBGP (AS 65217).
+# Before committing: check that no security, NAT or PBF rule references ae8, and review
+# "show config diff". Validate each command on the box.
+# =============================================================================
+
+# 1. Remove ae8 (OSPF, virtual router, zone, interface) and free its members.
+delete network virtual-router default protocol ospf area 0.0.0.0 interface ae8
+delete network virtual-router default interface ae8
+delete zone Trust network layer3 ae8
+delete network interface aggregate-ethernet ae8
+delete network interface ethernet ethernet1/24 aggregate-group
+delete network interface ethernet ethernet1/26 aggregate-group
+
+# 2. Two routed transit interfaces (Trust zone, VR default).
+set network interface ethernet ethernet1/24 layer3 ip 10.110.244.65/29
+set network interface ethernet ethernet1/24 comment "DC1-NXLF-03 Eth1/45-46 VLAN 3011 (10.110.244.64/29)"
+set network interface ethernet ethernet1/26 layer3 ip 10.110.244.73/29
+set network interface ethernet ethernet1/26 comment "DC1-NXLF-04 Eth1/45-46 VLAN 3012 (10.110.244.72/29)"
+set network virtual-router default interface [ ethernet1/24 ethernet1/26 ]
+set zone Trust network layer3 [ ethernet1/24 ethernet1/26 ]
+
+# 3. eBGP to both border leafs, ECMP across them. OSPF is no longer used.
+set network virtual-router default protocol bgp enable yes
+set network virtual-router default protocol bgp router-id 10.110.244.65
+set network virtual-router default protocol bgp local-as 65217
+set network virtual-router default protocol bgp install-route yes
+set network virtual-router default protocol bgp allow-redist-default-route yes
+set network virtual-router default protocol bgp routing-options ecmp-multi-as yes
+set network virtual-router default protocol bgp peer-group FABRIC enable yes type ebgp import-nexthop original export-nexthop resolve remove-private-as no
+set network virtual-router default protocol bgp peer-group FABRIC peer DC1-NXLF-03 enable yes peer-as 65213 local-address interface ethernet1/24 ip 10.110.244.65/29 peer-address ip 10.110.244.66 bfd profile default
+set network virtual-router default protocol bgp peer-group FABRIC peer DC1-NXLF-04 enable yes peer-as 65214 local-address interface ethernet1/26 ip 10.110.244.73/29 peer-address ip 10.110.244.74 bfd profile default
+set network virtual-router default ecmp enable yes max-path 2
+set network virtual-router default protocol ospf enable no
+
+# 4. Policy: send only the default route; accept only the DC1 and DC2 site prefixes.
+set network virtual-router default protocol bgp redist-rules 0.0.0.0/0 enable yes set-origin igp address-family-identifier ipv4
+set network virtual-router default protocol bgp policy export rules DEFAULT-ONLY enable yes used-by FABRIC match address-prefix 0.0.0.0/0 exact yes
+set network virtual-router default protocol bgp policy export rules DEFAULT-ONLY action allow
+set network virtual-router default protocol bgp policy export rules DENY-REST enable yes used-by FABRIC action deny
+set network virtual-router default protocol bgp policy import rules SITE-PREFIXES enable yes used-by FABRIC match address-prefix 10.110.0.0/16 exact no
+set network virtual-router default protocol bgp policy import rules SITE-PREFIXES match address-prefix 10.120.0.0/16 exact no
+set network virtual-router default protocol bgp policy import rules SITE-PREFIXES action allow
+set network virtual-router default protocol bgp policy import rules DENY-REST enable yes used-by FABRIC action deny
+
+# Commit, then check:
+#   show routing protocol bgp peer          -> 2 peers Established (65213, 65214)
+#   show routing route type bgp             -> site prefixes via both next hops
